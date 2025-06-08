@@ -37,12 +37,14 @@ Pulse is a modern, feature-rich web application built with React, TypeScript, an
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/pulse.git
 cd pulse
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 # or
@@ -52,6 +54,7 @@ bun install
 ```
 
 3. Start the development server:
+
 ```bash
 npm run dev
 # or
@@ -83,10 +86,3 @@ We welcome contributions! Please feel free to submit a Pull Request. For major c
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [shadcn/ui](https://ui.shadcn.com/) for the beautiful components
-- [Vite](https://vitejs.dev/) for the amazing build tool
-- [Tailwind CSS](https://tailwindcss.com/) for the utility-first CSS framework
-- All other open-source projects that made this possible 
