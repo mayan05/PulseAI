@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, List
 import uuid
 import json
-from .service import T3ChatController
+from service import T3ChatController
 
 # Import your AI service (assuming it's in a separate file)
 # from t3_chat_ai import T3ChatController

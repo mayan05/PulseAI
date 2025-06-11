@@ -1,8 +1,3 @@
-"""
-T3 Chat Clone - Complete AI Service Implementation
-Supports multiple AI providers with streaming responses
-"""
-
 import asyncio
 import json
 import os
@@ -11,16 +6,17 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import httpx
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv() # Load environment variables from .env file
 
 class AIProvider(Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
-    GOOGLE = "google"
-    COHERE = "cohere"
 
 @dataclass
 class ChatMessage:
-    role: str  # "user", "assistant", "system"
+    role: str  # "user", "system"
     content: str
     timestamp: datetime = None
     model: str = None
@@ -49,14 +45,14 @@ class T3ChatAI:
     def __init__(self):
         self.providers = {
             AIProvider.OPENAI: {
-                "api_key": os.getenv("OPENAI_API_KEY"),
+                "api_key": os.environ.get("OPENAI_API_KEY"),
                 "base_url": "https://api.openai.com/v1",
-                "models": ["gpt-4", "gpt-3.5-turbo", "gpt-4-turbo"]
+                "models": "gpt-4"
             },
             AIProvider.ANTHROPIC: {
-                "api_key": os.getenv("ANTHROPIC_API_KEY"),
+                "api_key": os.environ.get("ANTHROPIC_API_KEY"),
                 "base_url": "https://api.anthropic.com/v1",
-                "models": ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"]
+                "models": "claude-3-sonnet"
             }
         }
         self.sessions: Dict[str, ChatSession] = {}
