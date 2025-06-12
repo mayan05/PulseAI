@@ -41,18 +41,19 @@ class ChatSession:
 
 class T3ChatAI:
     """Main AI service for T3 Chat clone"""
+    ALLOWED_MODELS = ["gpt-4", "claude-3-sonnet"]
     
     def __init__(self):
         self.providers = {
             AIProvider.OPENAI: {
                 "api_key": os.environ.get("OPENAI_API_KEY"),
                 "base_url": "https://api.openai.com/v1",
-                "models": "gpt-4"
+                "models": ["gpt-4"]
             },
             AIProvider.ANTHROPIC: {
                 "api_key": os.environ.get("ANTHROPIC_API_KEY"),
                 "base_url": "https://api.anthropic.com/v1",
-                "models": "claude-3-sonnet"
+                "models": ["claude-3-sonnet"]
             }
         }
         self.sessions: Dict[str, ChatSession] = {}
@@ -61,9 +62,11 @@ class T3ChatAI:
     def create_session(self, 
                       session_id: str, 
                       system_prompt: str = None,
-                      model: str = "gpt-3.5-turbo",
+                      model: str = "gpt-4",
                       temperature: float = 0.7) -> ChatSession:
         """Create a new chat session"""
+        if model not in self.ALLOWED_MODELS:
+            raise ValueError(f"Model '{model}' is not allowed. Allowed models: {self.ALLOWED_MODELS}")
         session = ChatSession(
             session_id=session_id,
             messages=[],
@@ -275,16 +278,16 @@ class T3ChatAI:
         session = self.get_session(session_id)
         if not session:
             return False
-        
+        if model is not None:
+            if model not in self.ALLOWED_MODELS:
+                return False
+            session.model = model
         if system_prompt is not None:
             session.system_prompt = system_prompt
         if temperature is not None:
             session.temperature = temperature
-        if model is not None:
-            session.model = model
         if max_tokens is not None:
             session.max_tokens = max_tokens
-        
         return True
     
     def delete_session(self, session_id: str) -> bool:
@@ -297,9 +300,8 @@ class T3ChatAI:
     def get_available_models(self) -> Dict[str, List[str]]:
         """Get list of available models by provider"""
         return {
-            provider.value: config["models"] 
-            for provider, config in self.providers.items()
-            if config["api_key"]
+            AIProvider.OPENAI.value: ["gpt-4"],
+            AIProvider.ANTHROPIC.value: ["claude-3-sonnet"]
         }
 
 # FastAPI/Flask integration example
@@ -313,16 +315,16 @@ class T3ChatController:
         """Create new chat session endpoint"""
         session_id = request_data.get("session_id")
         system_prompt = request_data.get("system_prompt")
-        model = request_data.get("model", "gpt-3.5-turbo")
+        model = request_data.get("model", "gpt-4")
         temperature = request_data.get("temperature", 0.7)
-        
+        if model not in T3ChatAI.ALLOWED_MODELS:
+            raise ValueError(f"Model '{model}' is not allowed. Allowed models: {T3ChatAI.ALLOWED_MODELS}")
         session = self.ai_service.create_session(
             session_id=session_id,
             system_prompt=system_prompt,
             model=model,
             temperature=temperature
         )
-        
         return {
             "success": True,
             "session_id": session.session_id,
@@ -362,7 +364,7 @@ async def main():
     session = ai_service.create_session(
         session_id="test_session_1",
         system_prompt="You are a helpful AI assistant.",
-        model="gpt-3.5-turbo"
+        model="gpt-4"
     )
     
     print(f"Created session: {session.session_id}")

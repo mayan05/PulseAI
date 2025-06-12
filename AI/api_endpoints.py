@@ -1,6 +1,21 @@
+# Environment setup instructions:
 """
-T3 Chat Clone - FastAPI Endpoints
-Ready-to-use API endpoints for your backend integration
+1. Install dependencies:
+   pip install fastapi uvicorn python-multipart httpx
+
+2. Set environment variables:
+   export OPENAI_API_KEY="your-openai-api-key"
+   export ANTHROPIC_API_KEY="your-anthropic-api-key"  # optional
+
+3. Run the server:
+   python main.py
+   # or
+   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+API will be available at:
+- http://localhost:8000 (main API)
+- http://localhost:8000/docs (Swagger documentation)
+- http://localhost:8000/redoc (ReDoc documentation)
 """
 
 from fastapi import FastAPI, HTTPException, Request
@@ -10,7 +25,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, List
 import uuid
 import json
-from service import T3ChatController
+from .service import T3ChatController
 
 # Import your AI service (assuming it's in a separate file)
 # from t3_chat_ai import T3ChatController
@@ -32,9 +47,14 @@ ai_controller = T3ChatController()
 # Pydantic models for request/response validation
 class CreateSessionRequest(BaseModel):
     system_prompt: Optional[str] = "You are a helpful AI assistant."
-    model: str = "gpt-3.5-turbo"
+    model: str = "gpt-4"
     temperature: float = 0.7
     max_tokens: int = 2000
+    
+    def validate_model(self):
+        allowed = ["gpt-4", "claude-3-sonnet"]
+        if self.model not in allowed:
+            raise ValueError(f"Model '{self.model}' is not allowed. Allowed models: {allowed}")
 
 class ChatRequest(BaseModel):
     message: str
@@ -45,6 +65,11 @@ class UpdateSettingsRequest(BaseModel):
     model: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+    
+    def validate_model(self):
+        allowed = ["gpt-4", "claude-3-sonnet"]
+        if self.model is not None and self.model not in allowed:
+            raise ValueError(f"Model '{self.model}' is not allowed. Allowed models: {allowed}")
 
 class ChatResponse(BaseModel):
     success: bool
@@ -65,8 +90,8 @@ async def create_session(request: CreateSessionRequest):
     Create a new chat session
     """
     try:
+        request.validate_model()
         session_id = str(uuid.uuid4())
-        
         response = await ai_controller.create_chat_session({
             "session_id": session_id,
             "system_prompt": request.system_prompt,
@@ -74,9 +99,7 @@ async def create_session(request: CreateSessionRequest):
             "temperature": request.temperature,
             "max_tokens": request.max_tokens
         })
-        
         return response
-    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -143,6 +166,7 @@ async def update_session_settings(session_id: str, request: UpdateSettingsReques
     Update session settings (model, temperature, etc.)
     """
     try:
+        request.validate_model()
         settings = {}
         if request.system_prompt is not None:
             settings["system_prompt"] = request.system_prompt
@@ -152,10 +176,8 @@ async def update_session_settings(session_id: str, request: UpdateSettingsReques
             settings["temperature"] = request.temperature
         if request.max_tokens is not None:
             settings["max_tokens"] = request.max_tokens
-        
         response = await ai_controller.update_settings(session_id, settings)
         return response
-    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -177,9 +199,8 @@ async def get_available_models():
     Get list of available AI models
     """
     try:
-        models = ai_controller.ai_service.get_available_models()
+        models = {"openai": ["gpt-4"], "anthropic": ["claude-3-sonnet"]}
         return {"success": True, "models": models}
-    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -265,23 +286,3 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
-
-# Environment setup instructions:
-"""
-1. Install dependencies:
-   pip install fastapi uvicorn python-multipart httpx
-
-2. Set environment variables:
-   export OPENAI_API_KEY="your-openai-api-key"
-   export ANTHROPIC_API_KEY="your-anthropic-api-key"  # optional
-
-3. Run the server:
-   python main.py
-   # or
-   uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-API will be available at:
-- http://localhost:8000 (main API)
-- http://localhost:8000/docs (Swagger documentation)
-- http://localhost:8000/redoc (ReDoc documentation)
-"""
