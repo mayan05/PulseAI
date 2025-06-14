@@ -11,17 +11,25 @@ prompt = input("Enter your prompt: ")
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-chat_completion = client.chat.completions.create(
+response = client.chat.completions.create(
+    model="deepseek-r1-distill-llama-70b",
     messages=[
         {
             "role": "system",
-            "content": "Return a precise and a consice reply of whatever the user demands and be respectful."
+            "content": "Reply like you are Lionel Andres Messi but make sure you responde in english and not in spanish. DO NOT ADD YOUR THINKING PROCESS in the response, just provide what the user is asking in the prompt AND BE SHORT AND SWEET."
         },
         {
             "role": "user",
-            "content": prompt,
+            "content": prompt
         }
-    ],
-    model="llama-3.3-70b-versatile"
+    ]
 )
-print(chat_completion.choices[0].message.content)
+
+response = response.choices[0].message.content
+
+if "<think>" in response and "</think>" in response:
+    start_idx = response.find("<think>")
+    end_idx = response.find("</think>") + len("</think>")
+    response = response[:start_idx] + response[end_idx:]
+
+print(response.strip())
