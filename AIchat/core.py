@@ -19,6 +19,9 @@ app.add_middleware(
 
 SYSTEM_MESSAGE = "Make sure you are kind,welcoming, accurate and precise in    responding towards the prompts of the user. Make sure you reply ASAP and dont keep the user waiting for your response for too long"
 
+load_dotenv()
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
 class Models(BaseModal):
     llama = "llama-3.3-70b-versatile"
     chatgpt = ""
@@ -58,7 +61,9 @@ class ChatSession(BaseModal):
     def _trim_history(self):
         if len(self.messages) > self.max_token:
             ass_messages = [msg for msg in self.messages if msg.role == Role.ASS]
+
             recent_messages = [msg for msg in self.messages if msg.role != Role.ASS][-self.max_token:]
+
             self.messages = ass_messages + recent_messages
 
     def get_messages_for_api(self) -> List[Dict]:
@@ -70,53 +75,6 @@ class ChatSession(BaseModal):
             for msg in self.messages
         ]
 
-            ### ------------------AVENGE THEM------------------ ###
+    def get_total_tokens(self) -> int:
+        return sum(msg.tokens_used or 0 for msg in self.messages)
 
-
-
-
-
-
-load_dotenv()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-@app.post("/api/chat")
-def groq_time(prompt: str, chat_history: ChatSession): # calls llama 3.3 70B
-    messages = [
-        {
-            "role" : Role.SYS,
-            "content" : SYSTEM_MESSAGE
-        },
-        *chat_history,
-        {
-            "role": Role.USER,
-            "content": prompt,
-        }
-    ]
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=messages
-    )
-
-    reply = response.choices[0].message.content
-    chat_history.append({"role": "user", "content": prompt})
-    chat_history.append({"role": "assistant", "content": reply})
-    print(reply)
-
-    return reply
-
-def main():
-    print("\nWelcome to the T3 chat app!!!\nType 'quit' or 'exit' when your done. HAVE FUN!!!\n")
-
-    history = ChatSession()       # memory for the model
-
-    prompt = input("You: ")
-    while prompt not in ['quit', 'exit', 'Quit', 'Exit']:
-        groq_time(prompt, history)
-        prompt = input("You: ")
-
-    print("Until Next Time!! Ciao.")
-
-if __name__ == '__main__':
-    main()
-    
