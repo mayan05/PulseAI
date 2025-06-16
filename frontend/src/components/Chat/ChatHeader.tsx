@@ -1,30 +1,22 @@
-
 import React from 'react';
-import { Menu, Bot, ChevronDown } from 'lucide-react';
-import { useChatStore, LLMProvider } from '../../store/chatStore';
+import { Menu, Bot } from 'lucide-react';
+import { useChatStore } from '../../store/chatStore';
 import { Button } from '../ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+}
 
 interface ChatHeaderProps {
   onToggleSidebar: () => void;
+  user: User | null;
 }
 
-const providers: { value: LLMProvider; label: string; description: string }[] = [
-  { value: 'openai', label: 'OpenAI GPT-4', description: 'Most capable model' },
-  { value: 'groq', label: 'Groq Llama', description: 'Lightning fast inference' },
-  { value: 'openrouter', label: 'OpenRouter', description: 'Multiple model access' },
-];
-
-export const ChatHeader: React.FC<ChatHeaderProps> = ({ onToggleSidebar }) => {
-  const { selectedProvider, setProvider, chats, activeChat } = useChatStore();
-  
+export const ChatHeader: React.FC<ChatHeaderProps> = ({ onToggleSidebar, user }) => {
+  const { chats, activeChat } = useChatStore();
   const currentChat = chats.find(chat => chat.id === activeChat);
-  const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
 
   return (
     <div className="flex items-center justify-between p-4 border-b border-border bg-card/50 backdrop-blur-xl">
@@ -51,30 +43,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({ onToggleSidebar }) => {
         </div>
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="bg-card/50">
-            <span className="text-sm">{selectedProviderInfo?.label}</span>
-            <ChevronDown className="w-4 h-4 ml-2" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          {providers.map((provider) => (
-            <DropdownMenuItem
-              key={provider.value}
-              onClick={() => setProvider(provider.value)}
-              className={`cursor-pointer ${selectedProvider === provider.value ? 'bg-primary/10' : ''}`}
-            >
-              <div className="flex flex-col">
-                <span className="font-medium">{provider.label}</span>
-                <span className="text-xs text-muted-foreground">
-                  {provider.description}
-                </span>
-              </div>
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* App Name */}
+      <div className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+        Pulse
+      </div>
     </div>
   );
 };

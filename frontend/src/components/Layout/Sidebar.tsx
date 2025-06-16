@@ -1,46 +1,34 @@
-
 import React from 'react';
-import { Plus, MessageSquare, Settings, LogOut, Trash2, MoreVertical } from 'lucide-react';
+import { X, Plus, User, Settings, LogOut, MessageSquare, Sparkles, Trash2 } from 'lucide-react';
 import { useChatStore } from '../../store/chatStore';
+import { useAuthStore } from '@/store/auth';
 import { Button } from '../ui/button';
-import { cn } from '../../lib/utils';
+import { Link } from 'react-router-dom';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  user: User | null;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { 
-    chats, 
-    activeChat, 
-    createChat, 
-    setActiveChat, 
-    deleteChat,
-    setAuthenticated 
-  } = useChatStore();
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  profilePic?: string;
+}
 
-  const handleNewChat = () => {
-    createChat();
-    if (window.innerWidth < 768) {
-      onClose();
-    }
-  };
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, user }) => {
+  const { chats, activeChat, setActiveChat, createChat, deleteChat } = useChatStore();
+  const { logout } = useAuthStore();
 
-  const handleChatSelect = (chatId: string) => {
-    setActiveChat(chatId);
-    if (window.innerWidth < 768) {
-      onClose();
-    }
+  const handleLogout = () => {
+    logout();
   };
 
   const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
     e.stopPropagation();
     deleteChat(chatId);
-  };
-
-  const handleLogout = () => {
-    setAuthenticated(false);
   };
 
   const formatChatPreview = (chat: any) => {
@@ -66,107 +54,117 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <>
-      {/* Mobile overlay */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
-          onClick={onClose}
-        />
-      )}
-      
-      {/* Sidebar */}
-      <div className={cn(
-        "fixed left-0 top-0 h-full w-80 bg-card/95 backdrop-blur-xl border-r border-border z-50 transform transition-transform duration-300 ease-in-out",
-        isOpen ? "translate-x-0" : "-translate-x-full",
-        "md:relative md:translate-x-0"
-      )}>
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                Pulse
-              </h1>
-            </div>
-            
-            <Button 
-              onClick={handleNewChat}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              New Chat
-            </Button>
+    <div className={`h-full flex flex-col bg-card/50 backdrop-blur-xl border-r border-border ${isOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-200 ease-in-out`}>
+      {/* User Profile Section */}
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center ring-2 ring-primary/20">
+            <User className="w-5 h-5 text-primary" />
           </div>
-
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {chats.map((chat) => (
-              <div
-                key={chat.id}
-                onClick={() => handleChatSelect(chat.id)}
-                className={cn(
-                  "group p-3 rounded-xl cursor-pointer transition-all duration-200 chat-item-hover",
-                  activeChat === chat.id && "bg-primary/10 border border-primary/20 shadow-md"
-                )}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold truncate">
-                        {chat.title}
-                      </p>
-                      <span className="text-xs text-muted-foreground ml-2">
-                        {formatTimestamp(chat.updatedAt)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {formatChatPreview(chat)}
-                    </p>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-muted-foreground">
-                        {chat.messages.length} messages
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => handleDeleteChat(e, chat.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {chats.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p className="text-sm font-medium mb-1">No conversations yet</p>
-                <p className="text-xs">Start your first chat to get going</p>
-              </div>
-            )}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-medium text-sm truncate">{user?.name}</h3>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
-
-          {/* Footer */}
-          <div className="p-4 border-t border-border space-y-2">
-            <Button variant="ghost" className="w-full justify-start hover:bg-muted/50">
-              <Settings className="w-4 h-4 mr-3" />
-              Settings
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={handleLogout}
-              className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            >
-              <LogOut className="w-4 h-4 mr-3" />
-              Sign out
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
         </div>
       </div>
-    </>
+
+      {/* New Chat Button */}
+      <div className="p-4">
+        <Button
+          onClick={createChat}
+          className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          New Chat
+        </Button>
+      </div>
+
+      {/* Chat List */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {chats.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center p-4 text-muted-foreground">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Sparkles className="w-8 h-8 text-primary/70" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              Welcome to Pulse
+            </h3>
+            <p className="text-sm mb-1">Your AI-powered workspace</p>
+            <p className="text-xs text-muted-foreground/80 max-w-[200px]">
+              Start a new conversation to explore the capabilities of advanced AI models
+            </p>
+          </div>
+        ) : (
+          chats.map((chat) => (
+            <div
+              key={chat.id}
+              onClick={() => setActiveChat(chat.id)}
+              className={`group w-full p-3 text-left rounded-lg transition-all duration-200 cursor-pointer select-none ${
+                activeChat === chat.id
+                  ? 'bg-primary/10 text-primary shadow-sm'
+                  : 'hover:bg-muted/50'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-primary/70" />
+                      <h4 className="font-medium text-sm truncate">
+                        {chat.title || 'New Chat'}
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={e => handleDeleteChat(e, chat.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
+                      tabIndex={0}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-1">
+                    {chat.messages.length} messages
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Settings Section */}
+      <div className="p-4 border-t border-border space-y-2">
+        <Link
+          to="/settings"
+          className="w-full flex items-center justify-start gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg px-3 py-2 transition-colors"
+          style={{ textDecoration: 'none' }}
+        >
+          <Settings className="w-4 h-4" />
+          Settings
+        </Link>
+        <div className="text-xs text-muted-foreground text-center">
+          Pulse v1.0.0
+        </div>
+      </div>
+
+      {/* Mobile Close Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onClose}
+        className="md:hidden absolute top-4 right-4"
+      >
+        <X className="w-4 h-4" />
+      </Button>
+    </div>
   );
 };

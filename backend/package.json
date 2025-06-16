@@ -1,20 +1,22 @@
 {
-  "name": "backend",
-  "module": "index.ts",
+  "name": "t3-chat-backend",
+  "version": "1.0.0",
+  "module": "src/index.ts",
   "type": "module",
-  "private": true,
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
   },
   "dependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/node": "^22.15.30",
-    "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^5.1.0"
+    "@prisma/client": "^5.10.2",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.2.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.11.24",
+    "bun-types": "latest",
+    "prisma": "^5.10.2",
+    "typescript": "^5.3.3"
   }
 }

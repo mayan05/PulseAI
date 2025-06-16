@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { useChatStore } from '../../store/chatStore';
 import { MessageBubble } from './MessageBubble';
@@ -50,17 +49,28 @@ export const ChatMessages: React.FC = () => {
     >
       {messages.length === 0 ? (
         <div className="flex items-center justify-center h-full">
-          <div className="text-center max-w-md">
-            <div className="w-24 h-24 mx-auto mb-8 rounded-3xl bg-gradient-to-br from-primary/20 via-primary/10 to-accent/10 flex items-center justify-center shadow-xl">
-              <span className="text-4xl">🚀</span>
+          <div className="text-center max-w-md mx-auto">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/30 to-background/80 flex items-center justify-center shadow-2xl border border-primary/10">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="48" height="48" rx="16" fill="#181825" />
+                <path d="M24 8c-2.5 0-4.5 2-4.5 4.5V16h9V12.5C28.5 10 26.5 8 24 8z" fill="#a78bfa"/>
+                <path d="M19.5 16v2.5c0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5V16h-9z" fill="#818cf8"/>
+                <ellipse cx="24" cy="28" rx="7" ry="10" fill="#6366f1"/>
+                <ellipse cx="24" cy="28" rx="3" ry="5" fill="#fff" fillOpacity=".7"/>
+                <path d="M24 38c-2 0-3.5-1.5-3.5-3.5h7c0 2-1.5 3.5-3.5 3.5z" fill="#fbbf24"/>
+              </svg>
             </div>
-            <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Ready to chat with AI
-            </h3>
-            <p className="text-muted-foreground leading-relaxed">
-              Ask me anything! I can help with coding, creative writing, analysis, and much more.
-              Try typing <span className="font-mono bg-muted px-1 py-0.5 rounded text-xs">/imagine</span> for image generation.
-            </p>
+            <div className="bg-card/80 rounded-2xl shadow-xl px-8 py-6 border border-border backdrop-blur-md">
+              <h3 className="text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Ready to chat with AI
+              </h3>
+              <p className="text-muted-foreground mb-2">
+                Ask anything—get instant help with code, ideas, research, and more. Try <span className="font-mono bg-muted px-1 py-0.5 rounded text-xs">/imagine</span> for image generation.
+              </p>
+              <p className="text-xs text-muted-foreground/80">
+                Try <span className="font-mono bg-muted px-1 py-0.5 rounded text-xs">/imagine</span> for image generation, or start a new conversation to explore more features.
+              </p>
+            </div>
           </div>
         </div>
       ) : (

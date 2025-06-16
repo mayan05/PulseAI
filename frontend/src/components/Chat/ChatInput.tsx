@@ -1,16 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, Image, FileText, Command } from 'lucide-react';
-import { useChatStore, Attachment } from '../../store/chatStore';
+import { Send, Paperclip, X, Image, FileText, Command, ChevronDown } from 'lucide-react';
+import { useChatStore, Attachment, LLMProvider } from '../../store/chatStore';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+
+const providers: { value: LLMProvider; label: string; description: string }[] = [
+  { value: 'openai', label: 'OpenAI GPT-4', description: 'Most capable model' },
+  { value: 'groq', label: 'Groq Llama', description: 'Lightning fast inference' },
+  { value: 'openrouter', label: 'OpenRouter', description: 'Multiple model access' },
+];
 
 export const ChatInput: React.FC = () => {
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showCommands, setShowCommands] = useState(false);
-  const { activeChat, addMessage, setLoading, isLoading } = useChatStore();
+  const { activeChat, addMessage, setLoading, isLoading, selectedProvider, setProvider } = useChatStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
 
   const commands = [
     { name: '/imagine', description: 'Generate an image' },
@@ -194,14 +208,44 @@ export const ChatInput: React.FC = () => {
             />
           </div>
 
-          <Button 
-            type="submit" 
-            disabled={!message.trim() || isLoading}
-            className="flex-shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-            size="sm"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center space-x-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-9 px-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                >
+                  <span>{selectedProviderInfo?.label}</span>
+                  <ChevronDown className="w-3 h-3 ml-1.5 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                {providers.map((provider) => (
+                  <DropdownMenuItem
+                    key={provider.value}
+                    onClick={() => setProvider(provider.value)}
+                    className={`cursor-pointer ${selectedProvider === provider.value ? 'bg-primary/10' : ''}`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">{provider.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {provider.description}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button 
+              type="submit" 
+              disabled={!message.trim() || isLoading}
+              className="flex-shrink-0 h-9 w-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="mt-2 text-xs text-muted-foreground px-3">
