@@ -14,6 +14,8 @@ const Index = () => {
   const isResizing = useRef(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -55,6 +57,31 @@ const Index = () => {
 
   return (
     <div className="h-screen flex bg-background relative">
+      {/* Login/Signup overlay for first-time visitors */}
+      {!token && !hasInteracted && !showAuthModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
+          <button
+            className="px-8 py-4 rounded-2xl bg-primary text-primary-foreground text-lg font-semibold shadow-xl hover:bg-primary/90 transition"
+            onClick={() => setShowAuthModal(true)}
+          >
+            Login / Sign Up
+          </button>
+        </div>
+      )}
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-card rounded-2xl shadow-2xl border border-border p-0 max-w-md w-full relative">
+            <button
+              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground text-xl"
+              onClick={() => setShowAuthModal(false)}
+            >
+              ×
+            </button>
+            <AuthPage />
+          </div>
+        </div>
+      )}
       {/* Background decoration */}
       <div className="fixed inset-0 -z-10 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse" />

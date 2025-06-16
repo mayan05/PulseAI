@@ -23,6 +23,7 @@ export const ChatInput: React.FC = () => {
   const { activeChat, addMessage, setLoading, isLoading, selectedProvider, setProvider } = useChatStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
 
@@ -55,7 +56,6 @@ export const ChatInput: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!message.trim() || !activeChat || isLoading) return;
 
     const userMessage = {
@@ -67,6 +67,7 @@ export const ChatInput: React.FC = () => {
     addMessage(activeChat, userMessage);
     setMessage('');
     setAttachments([]);
+    textareaRef.current?.focus();
 
     setLoading(true);
     
@@ -94,6 +95,12 @@ export const ChatInput: React.FC = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
+    }
+  };
+
+  const handleInputFocus = () => {
+    if (!hasInteracted) {
+      setHasInteracted(true);
     }
   };
 
@@ -190,7 +197,9 @@ export const ChatInput: React.FC = () => {
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              fileInputRef.current?.click();
+            }}
             className="flex-shrink-0 p-2 hover:bg-muted/50 rounded-xl"
           >
             <Paperclip className="w-4 h-4" />
@@ -200,11 +209,14 @@ export const ChatInput: React.FC = () => {
             <Textarea
               ref={textareaRef}
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value);
+              }}
               onKeyDown={handleKeyDown}
+              onFocus={handleInputFocus}
+              onClick={handleInputFocus}
               placeholder="Ask anything..."
               className="min-h-[44px] max-h-32 resize-none bg-transparent border-0 focus:ring-0 focus:border-0 text-sm placeholder:text-muted-foreground/70"
-              disabled={isLoading}
             />
           </div>
 

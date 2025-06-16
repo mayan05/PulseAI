@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { User, Bot, Copy, Check, FileText, ExternalLink } from 'lucide-react';
 import { Message } from '../../store/chatStore';
@@ -86,7 +85,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
   return (
     <>
-      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6 message-animate`}>
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-1 message-animate`}>
         <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start space-x-3 max-w-4xl group`}>
           {/* Profile Avatar */}
           <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
@@ -97,9 +96,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
           {/* Message Content */}
           <div 
-            className={`relative ${isUser ? 'message-user' : 'message-ai'} p-4 max-w-[80%] transition-all duration-200 hover:shadow-xl`}
-            onMouseEnter={() => setShowTimestamp(true)}
-            onMouseLeave={() => setShowTimestamp(false)}
+            className={`relative ${isUser ? 'message-user' : 'message-ai'} px-3 py-2 max-w-[80%] transition-all duration-200 hover:shadow-xl`}
           >
             {/* Text Content */}
             {message.content && (
@@ -107,11 +104,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 {message.content}
               </div>
             )}
-            
             {/* Attachments */}
             {message.attachments && message.attachments.length > 0 && (
-              <div className={`${message.content ? 'mt-3' : ''} space-y-3`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className={`${message.content ? 'mt-2' : ''} space-y-2`}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {message.attachments.map((attachment) => (
                     <div key={attachment.id}>
                       {renderAttachmentThumbnail(attachment)}
@@ -120,34 +116,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 </div>
               </div>
             )}
-
-            {/* Message Actions */}
-            <div className={`flex items-center justify-between mt-3 pt-2 border-t ${
-              isUser ? 'border-white/20' : 'border-border'
-            }`}>
-              <div className="flex items-center space-x-2">
-                <span className={`text-xs transition-opacity ${
-                  showTimestamp ? 'opacity-100' : 'opacity-0'
-                }`}>
-                  {formatTime(message.timestamp)}
-                </span>
-              </div>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopy}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto hover:bg-white/10"
-              >
-                {copied ? (
-                  <Check className="w-3 h-3" />
-                ) : (
-                  <Copy className="w-3 h-3" />
-                )}
-              </Button>
-            </div>
+            {/* Message Actions (copy) - top right, only on hover */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCopy}
+              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto hover:bg-white/10"
+            >
+              {copied ? (
+                <Check className="w-3 h-3" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+            </Button>
           </div>
         </div>
+      </div>
+      {/* Timestamp below bubble, aligned to sender */}
+      <div className={`mb-4 text-xs text-muted-foreground ${isUser ? 'text-right mr-12' : 'text-left pl-16'}`}>
+        {formatTime(message.timestamp)}
       </div>
 
       {/* Image Preview Modal */}
