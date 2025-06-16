@@ -1,7 +1,7 @@
 import os
 from groq import Groq
 from pydantic import BaseModel 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware 
 import uvicorn
 
@@ -20,15 +20,9 @@ app.add_middleware(
 )
 
 llama = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# ADD CLAUDE
 
 llama_history = [
-    {
-        "role": "system",
-        "content": SYSTEM_MESSAGE
-    }
-]
-
-gpt_history = [
     {
         "role": "system",
         "content": SYSTEM_MESSAGE
