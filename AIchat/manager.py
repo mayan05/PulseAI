@@ -1,16 +1,8 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 from typing import Dict, Optional
 from datetime import datetime
 import time
-import os
 from core import (
     ChatSession, 
-    ChatRequest, 
-    ChatResponse, 
-    SessionInfo,
-    Models,
     Role,
     SYSTEM_MESSAGE
 )

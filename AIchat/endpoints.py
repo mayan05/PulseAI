@@ -2,14 +2,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import uvicorn
-from typing import Dict, Optional
+from typing import Dict
 from datetime import datetime
-import time
 import os
 from groq import Groq
 from manager import ChatManager
-from core import (
-    ChatSession, 
+from core import ( 
     ChatRequest, 
     ChatResponse, 
     SessionInfo,
@@ -42,7 +40,7 @@ async def chat_endpoint(request: ChatRequest):
             user_id=request.user_id
         )
         
-        user_message = session.add_message("user", request.message)
+        user_message = session.add_message(Role.USER, request.message)
         
         # Get messages for API
         messages = session.get_messages_for_api()

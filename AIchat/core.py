@@ -46,7 +46,7 @@ class ChatSession(BaseModel):
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: Optional[str] = None  
     messages: List[Message] = Field(default_factory=list)
-    model: Models = Models.llama             # CHANGE THIS LATER AND MAKE IT GENERAL
+    model: Models = Models       
     max_history_length: int = 100
     created_at: datetime = Field(default_factory=datetime.now)
     last_activity: datetime = Field(default_factory=datetime.now)
