@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 
 export interface Attachment {
@@ -25,7 +24,7 @@ export interface Chat {
   updatedAt: Date;
 }
 
-export type LLMProvider = 'openai' | 'groq' | 'openrouter';
+export type LLMProvider = 'openai' | 'groq' | 'openrouter' | 'gpt4.1';
 
 interface ChatState {
   chats: Chat[];
@@ -59,7 +58,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   chats: [createDefaultChat()],
   activeChat: `chat_${Date.now()}`,
   isAuthenticated: false,
-  selectedProvider: 'openai',
+  selectedProvider: 'gpt4.1',
   isLoading: false,
 
   createChat: () => {

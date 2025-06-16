@@ -4,6 +4,8 @@ import { Message } from '../../store/chatStore';
 import { Button } from '../ui/button';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface MessageBubbleProps {
   message: Message;
@@ -13,6 +15,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const [copied, setCopied] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<any>(null);
   const [showTimestamp, setShowTimestamp] = useState(false);
+  const [showAttachments, setShowAttachments] = useState(false);
   const isUser = message.role === 'user';
 
   const handleCopy = async () => {
@@ -99,11 +102,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             className={`relative ${isUser ? 'message-user' : 'message-ai'} px-3 py-2 max-w-[80%] transition-all duration-200 hover:shadow-xl`}
           >
             {/* Text Content */}
-            {message.content && (
-              <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {message.content}
-              </div>
-            )}
+              </ReactMarkdown>
+            </div>
             {/* Attachments */}
             {message.attachments && message.attachments.length > 0 && (
               <div className={`${message.content ? 'mt-2' : ''} space-y-2`}>
@@ -117,18 +120,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               </div>
             )}
             {/* Message Actions (copy) - top right, only on hover */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCopy}
-              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto hover:bg-white/10"
-            >
-              {copied ? (
-                <Check className="w-3 h-3" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
-            </Button>
+            <div className="mt-2 flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopy}
+                className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                {copied ? (
+                  <Check className="w-3 h-3" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -154,6 +159,56 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {message.attachments && message.attachments.length > 0 && (
+        <Dialog open={showAttachments} onOpenChange={setShowAttachments}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Attachments</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2">
+              {message.attachments.map((attachment) => (
+                <div
+                  key={attachment.id}
+                  className="flex items-center space-x-2 p-2 rounded-lg bg-muted"
+                >
+                  {attachment.type.startsWith('image/') ? (
+                    <img
+                      src={attachment.url}
+                      alt={attachment.name}
+                      className="w-8 h-8 object-cover rounded"
+                    />
+                  ) : (
+                    <FileText className="w-8 h-8 text-muted-foreground" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {attachment.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {(attachment.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    className="flex-shrink-0"
+                  >
+                    <a
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 };

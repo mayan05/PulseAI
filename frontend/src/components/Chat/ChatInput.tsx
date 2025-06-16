@@ -11,6 +11,7 @@ import {
 } from '../ui/dropdown-menu';
 
 const providers: { value: LLMProvider; label: string; description: string }[] = [
+  { value: 'gpt4.1', label: 'GPT-4.1', description: 'Latest GPT model' },
   { value: 'openai', label: 'OpenAI GPT-4', description: 'Most capable model' },
   { value: 'groq', label: 'Groq Llama', description: 'Lightning fast inference' },
   { value: 'openrouter', label: 'OpenRouter', description: 'Multiple model access' },
@@ -71,24 +72,57 @@ export const ChatInput: React.FC = () => {
 
     setLoading(true);
     
-    setTimeout(() => {
-      const responses = [
-        "I understand your question. Let me help you with that...",
-        "That's an interesting point! Here's what I think...",
-        "Great question! Based on my knowledge, I can tell you that...",
-        "I'd be happy to help with that. Let me break it down for you...",
-        "Thanks for asking! Here's a comprehensive answer...",
-      ];
-      
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      
+    try {
+      if (selectedProvider === 'gpt4.1') {
+        const response = await fetch('http://localhost:8000/gpt/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: message.trim(),
+            temperature: 0.5,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate response');
+        }
+
+        const data = await response.json();
+        
+        addMessage(activeChat, {
+          content: data.text,
+          role: 'assistant',
+        });
+      } else {
+        // Simulated response for other providers
+        setTimeout(() => {
+          const responses = [
+            "I understand your question. Let me help you with that...",
+            "That's an interesting point! Here's what I think...",
+            "Great question! Based on my knowledge, I can tell you that...",
+            "I'd be happy to help with that. Let me break it down for you...",
+            "Thanks for asking! Here's a comprehensive answer...",
+          ];
+          
+          const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+          
+          addMessage(activeChat, {
+            content: randomResponse + "\n\n(This is a simulated response. In the full implementation, this would connect to your chosen AI provider.)",
+            role: 'assistant',
+          });
+        }, 1500 + Math.random() * 1000);
+      }
+    } catch (error) {
+      console.error('Error:', error);
       addMessage(activeChat, {
-        content: randomResponse + "\n\n(This is a simulated response. In the full implementation, this would connect to your chosen AI provider.)",
+        content: "Sorry, I encountered an error while processing your request. Please try again.",
         role: 'assistant',
       });
-      
+    } finally {
       setLoading(false);
-    }, 1500 + Math.random() * 1000);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

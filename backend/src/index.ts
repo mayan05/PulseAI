@@ -243,6 +243,57 @@ const server = Bun.serve({
         return new Response(JSON.stringify({ message: "Password updated" }), { headers });
       }
 
+      // POST /generate - handle LLM generation requests
+      if (url.pathname === "/generate" && req.method === "POST") {
+        const user = await getUserFromRequest(req);
+        if (!user) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+        }
+
+        const body = await req.json() as { 
+          prompt: string;
+          model: "gpt" | "claude";
+          temperature?: number;
+        };
+
+        const { prompt, model, temperature = 0.7 } = body;
+
+        if (!prompt || !model) {
+          return new Response(
+            JSON.stringify({ error: "Missing required fields" }),
+            { status: 400, headers }
+          );
+        }
+
+        try {
+          // Call the FastAPI LLM service
+          const llmResponse = await fetch(`http://localhost:8000/${model}/generate`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              prompt,
+              temperature,
+            }),
+          });
+
+          if (!llmResponse.ok) {
+            throw new Error(`LLM service error: ${llmResponse.statusText}`);
+          }
+
+          const response = await llmResponse.json();
+
+          return new Response(JSON.stringify(response), { headers });
+        } catch (error) {
+          console.error("LLM generation error:", error);
+          return new Response(
+            JSON.stringify({ error: "Failed to generate response" }),
+            { status: 500, headers }
+          );
+        }
+      }
+
       // Handle unknown routes
       return new Response(
         JSON.stringify({ error: "Not found" }),
