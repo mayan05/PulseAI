@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, X, Image, FileText, Command, ChevronDown, Check } from 'lucide-react';
-import { useChatStore, Attachment, LLMProvider } from '../../store/chatStore';
+import { useChatStore, Attachment, LLMProvider, Message } from '../../store/chatStore';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import {
@@ -40,6 +40,7 @@ export const ChatInput: React.FC = () => {
   const [fileUploadError, setFileUploadError] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [hoveredProvider, setHoveredProvider] = useState<LLMProvider | null>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
   const currentChat = chats.find(chat => chat.id === activeChat);
@@ -85,80 +86,181 @@ export const ChatInput: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Save the current message value before clearing
-    const msg = message;
+    if (!message.trim() && !selectedFile) return;
+
+    const msg = message.trim();
     const currentActiveChat = activeChat;
+    const token = localStorage.getItem('token');
     console.log('handleSubmit called with:', { msg, activeChat: currentActiveChat });
-    
-    // If there's a file selected, handle file upload
-    if (selectedFile) {
-      const fileType = selectedFile.type.toLowerCase();
-      const isPdf = fileType === 'application/pdf';
-      const isText = fileType === 'text/plain';
-      
-      if (!isPdf && !isText) {
-        setFileUploadError('Only PDF and TXT files are supported.');
+
+    // Clear input immediately for better UX
+    setMessage('');
+
+    try {
+      // Always call addMessage for all message types (TXT, PDF, regular)
+      if (selectedFile && selectedFile.type === 'text/plain') {
+        clearSelectedFile();
+        const fileText = await selectedFile.text();
+        const fullMsg = msg + '\n\n---\nAttached file contents:\n' + fileText;
+        await addMessage(currentActiveChat!, {
+          content: fullMsg,
+          type: 'FILE',
+          model: selectedProvider,
+          role: 'USER',
+          attachments: [{
+            id: `file-${Date.now()}`,
+            name: selectedFile.name,
+            type: selectedFile.type,
+            size: selectedFile.size,
+            url: URL.createObjectURL(selectedFile)
+          }],
+        });
         return;
       }
-
-      // Clear input immediately for better UX
-      setMessage('');
-      setSelectedFile(null);
-
+      if (selectedFile && selectedFile.type === 'application/pdf') {
+        clearSelectedFile();
+        await addMessage(currentActiveChat!, {
+          content: msg,
+          type: 'FILE',
+          model: selectedProvider,
+          role: 'USER',
+          attachments: [{
+            id: `file-${Date.now()}`,
+            name: selectedFile.name,
+            type: selectedFile.type,
+            size: selectedFile.size,
+            url: URL.createObjectURL(selectedFile),
+            file: selectedFile
+          }],
+        });
+        return;
+      }
+      // Fallback: /image or regular message
       if (!currentActiveChat) {
         // Create chat and send message in parallel
         const newChat = await createChat();
         if (newChat && newChat.id) {
           setActiveChat(newChat.id);
-          addMessage(newChat.id, {
-            content: `Uploaded file: ${selectedFile.name}`,
-            type: 'FILE',
+          clearSelectedFile();
+          await addMessage(newChat.id, {
+            content: msg,
+            type: selectedFile ? 'FILE' : 'TEXT',
             model: selectedProvider,
             role: 'USER',
-            fileType: isPdf ? 'pdf' : 'txt',
-            fileName: selectedFile.name,
+            attachments: selectedFile ? [{
+              id: `file-${Date.now()}`,
+              name: selectedFile.name,
+              type: selectedFile.type,
+              size: selectedFile.size,
+              url: URL.createObjectURL(selectedFile)
+            }] : undefined
           });
         }
       } else {
-        addMessage(currentActiveChat, {
-          content: `Uploaded file: ${selectedFile.name}`,
-          type: 'FILE',
-          model: selectedProvider,
-          role: 'USER',
-          fileType: isPdf ? 'pdf' : 'txt',
-          fileName: selectedFile.name,
-        });
+        if (msg.toLowerCase().startsWith('/image')) {
+          const imagePrompt = msg.slice('/image'.length).trim();
+          if (!imagePrompt) {
+            console.error('No image prompt provided');
+            return;
+          }
+          setLoading(true);
+          try {
+            const response = await fetch('http://localhost:8000/gpt/generate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({ 
+                prompt: msg,
+                temperature: 0.7
+              }),
+            });
+            if (!response.ok) {
+              throw new Error('Failed to generate image');
+            }
+            const data = await response.json();
+            const userMessage: Message = {
+              id: `temp-${Date.now()}`,
+              content: msg,
+              type: 'TEXT' as const,
+              model: selectedProvider,
+              role: 'USER',
+              createdAt: new Date(),
+              timestamp: new Date(),
+              conversationId: currentActiveChat,
+            };
+            const aiMessage: Message = {
+              id: `temp-${Date.now() + 1}`,
+              content: data.image
+                ? `![Generated Image](${data.image})`
+                : data.image_url
+                  ? `![Generated Image](${data.image_url})`
+                  : 'Image generation failed',
+              type: 'TEXT' as const,
+              model: selectedProvider,
+              role: 'ASSISTANT',
+              createdAt: new Date(),
+              timestamp: new Date(),
+              conversationId: currentActiveChat,
+            };
+            useChatStore.setState((state) => ({
+              ...state,
+              chats: state.chats.map((chat) =>
+                chat.id === currentActiveChat
+                  ? {
+                      ...chat,
+                      messages: [...(chat.messages || []), userMessage, aiMessage],
+                    }
+                  : chat
+              ),
+            }));
+          } catch (error) {
+            console.error('Error generating image:', error);
+            const errorMessage: Message = {
+              id: `temp-${Date.now()}`,
+              content: 'Sorry, I encountered an error while generating the image. Please try again.',
+              type: 'TEXT' as const,
+              model: 'gpt',
+              role: 'ASSISTANT',
+              createdAt: new Date(),
+              timestamp: new Date(),
+              conversationId: currentActiveChat,
+            };
+            useChatStore.setState((state) => ({
+              ...state,
+              chats: state.chats.map((chat) =>
+                chat.id === currentActiveChat
+                  ? {
+                      ...chat,
+                      messages: [...(chat.messages || []), errorMessage],
+                    }
+                  : chat
+              ),
+            }));
+          } finally {
+            setLoading(false);
+          }
+        } else {
+          clearSelectedFile();
+          await addMessage(currentActiveChat, {
+            content: msg,
+            type: selectedFile ? 'FILE' : 'TEXT',
+            model: selectedProvider,
+            role: 'USER',
+            attachments: selectedFile ? [{
+              id: `file-${Date.now()}`,
+              name: selectedFile.name,
+              type: selectedFile.type,
+              size: selectedFile.size,
+              url: URL.createObjectURL(selectedFile)
+            }] : undefined
+          });
+        }
       }
-      return;
-    }
-
-    if (!msg.trim()) {
-      console.warn('Cannot send empty message');
-      return;
-    }
-
-    // Clear input immediately for better UX
-    setMessage('');
-
-    if (!currentActiveChat) {
-      // Create chat and send message in parallel
-      const newChat = await createChat();
-      if (newChat && newChat.id) {
-        setActiveChat(newChat.id);
-        addMessage(newChat.id, {
-          content: msg,
-          type: 'TEXT',
-          model: selectedProvider,
-          role: 'USER',
-        });
-      }
-    } else {
-      addMessage(currentActiveChat, {
-        content: msg,
-        type: 'TEXT',
-        model: selectedProvider,
-        role: 'USER',
-      });
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      setLoading(false);
     }
   };
 
@@ -196,6 +298,13 @@ export const ChatInput: React.FC = () => {
       return;
     }
 
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setFileUploadError('File size must be less than 10MB.');
+      setSelectedFile(null);
+      return;
+    }
+
     setFileUploadError(null);
     setSelectedFile(file);
     // Automatically switch to GPT when a file is selected and provider is Claude or GPT
@@ -223,6 +332,13 @@ export const ChatInput: React.FC = () => {
     cmd.name.toLowerCase().includes(message.toLowerCase())
   );
 
+  // Helper to clear selected file and reset file input
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    setFileInputKey((k) => k + 1);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   return (
     <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-white/10">
       <form onSubmit={handleSubmit} className="container max-w-4xl mx-auto p-4 flex flex-col gap-2">
@@ -238,110 +354,54 @@ export const ChatInput: React.FC = () => {
               <span className="ml-2 px-2 py-0.5 rounded bg-blue-500/80 text-xs text-white font-semibold uppercase">{selectedFile.type.split('/')[1] || 'file'}</span>
               <button
                 type="button"
-                className="ml-2 text-white/60 hover:text-red-400 transition"
-                onClick={e => {
-                  e.stopPropagation();
-                  setSelectedFile(null);
-                }}
-                title="Remove attachment"
+                onClick={() => clearSelectedFile()}
+                className="p-1 rounded-full hover:bg-white/10 transition-colors"
               >
-                ×
+                <X className="w-4 h-4 text-white/70" />
               </button>
             </div>
           </div>
         )}
-        {/* Input and controls split into two flex items */}
-        <div className="flex flex-row w-full gap-2">
-          {/* Left: Input area */}
-          <div className="flex-1 relative flex flex-col justify-end">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              className="hidden"
-              disabled={selectedProvider === 'llama'}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className={`absolute left-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-white/10 ${
-                selectedProvider === 'llama' ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              onClick={() => {
-                if (selectedProvider === 'llama') {
-                  setFileUploadError('File upload is only supported for GPT-4 and Claude.');
-                  return;
-                }
-                setFileUploadError(null);
-                fileInputRef.current?.click();
-              }}
-              disabled={selectedProvider === 'llama'}
-            >
-              <Paperclip className="h-5 w-5" />
-            </Button>
-            {/* Show error if file upload is not allowed */}
-            {fileUploadError && (
-              <div className="absolute left-12 bottom-full mb-2 bg-red-600 text-white px-2 py-1 rounded text-sm flex items-center z-10">
-                <span>{fileUploadError}</span>
-                <button
-                  type="button"
-                  className="ml-2 text-white/80 hover:text-white"
-                  onClick={() => setFileUploadError(null)}
-                >
-                  ×
-                </button>
-              </div>
-            )}
-            <textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => {
-                setMessage(e.target.value);
-                if (textareaRef.current) {
-                  textareaRef.current.style.height = 'auto';
-                  textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 300)}px`;
-                }
-              }}
-              onKeyDown={(e) => {
-                if (showCommands && filteredCommands.length > 0) {
-                  if (e.key === 'ArrowDown' || e.key === 'Tab') {
-                    e.preventDefault();
-                    // Move selection down (not implemented in this snippet, but can be added for full UX)
-                  } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleCommandSelect(filteredCommands[0].name);
-                    return;
-                  }
-                }
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-              placeholder={`Message ${providers.find(p => p.value === selectedProvider)?.label || "AI"}...`}
-              className="w-full bg-white/5 text-white rounded-lg pl-12 pr-2 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none overflow-hidden leading-relaxed break-words break-all"
-              style={{ minHeight: "48px", maxHeight: "300px", height: "auto", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap" }}
-              rows={1}
-            />
-            {/* Command dropdown, positioned relative to the input area */}
-            {showCommands && filteredCommands.length > 0 && (
-              <div className="absolute left-0 right-0 bottom-full mb-2 w-full max-w-full bg-[#232323] border border-white/10 rounded-lg shadow-lg z-30">
-                {filteredCommands.map((cmd, idx) => (
-                  <div
-                    key={cmd.name}
-                    className={`px-4 py-2 cursor-pointer text-white/90 hover:bg-white/10 ${idx === 0 ? 'rounded-t-lg' : ''} ${idx === filteredCommands.length - 1 ? 'rounded-b-lg' : ''}`}
-                    onMouseDown={() => handleCommandSelect(cmd.name)}
-                  >
-                    <span className="font-mono text-sm">{cmd.name}</span>
-                    <span className="ml-2 text-xs text-white/50">{cmd.description}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          {/* Right: Controls */}
-          <div className="flex flex-row items-center gap-2 min-w-[120px] ml-2 pb-0">
+
+        {/* File upload error message */}
+        {fileUploadError && (
+          <div className="text-red-500 text-sm mb-2">{fileUploadError}</div>
+        )}
+
+        <div className="relative flex items-center gap-2">
+          {/* File upload button */}
+          <input
+            key={fileInputKey}
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            className="hidden"
+            accept=".pdf,.txt"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute left-3 p-2 rounded-full hover:bg-white/10 transition-colors"
+            title="Attach file"
+          >
+            <Paperclip className="w-5 h-5 text-white/70" />
+          </button>
+
+          {/* Message input */}
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={handleInputFocus}
+            placeholder={hasInteracted ? "Type a message..." : "Press / to see commands"}
+            className="w-full bg-white/5 text-white rounded-lg pl-12 pr-32 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none overflow-hidden leading-relaxed break-words break-all"
+            style={{ minHeight: "48px", maxHeight: "300px", height: "auto", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap" }}
+            rows={1}
+          />
+
+          {/* Model selection dropdown */}
+          <div className="absolute right-12 top-1/2 -translate-y-1/2 z-10">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
@@ -379,19 +439,44 @@ export const ChatInput: React.FC = () => {
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button 
-              type="submit" 
-              disabled={isLoading || (!message.trim() && !selectedFile)} 
-              className="bg-white/10 text-white hover:bg-white/20"
-            >
-              Send
-            </Button>
           </div>
+
+          {/* Send button */}
+          <button
+            type="submit"
+            disabled={(!message.trim() && !selectedFile) || isLoading}
+            className={`absolute right-3 p-2 rounded-full transition-colors ${
+              (!message.trim() && !selectedFile) || isLoading
+                ? 'text-white/30 cursor-not-allowed'
+                : 'text-white/70 hover:bg-white/10'
+            }`}
+          >
+            <Send className="w-5 h-5" />
+          </button>
         </div>
+
+        {/* Subtle /image suggestion below input */}
+        <div className="mt-1 text-xs text-white/40 flex items-center gap-2 select-none">
+          <span className="bg-white/10 px-1.5 py-0.5 rounded font-mono text-xs text-white/60">/image</span>
+          <span>Type <span className="font-mono text-white/60">/image</span> to generate an image</span>
+        </div>
+
+        {/* Command dropdown */}
+        {showCommands && filteredCommands.length > 0 && (
+          <div className="absolute left-0 right-0 bottom-full mb-2 w-full max-w-full bg-[#232323] border border-white/10 rounded-lg shadow-lg z-30">
+            {filteredCommands.map((cmd, idx) => (
+              <div
+                key={cmd.name}
+                className={`px-4 py-2 cursor-pointer text-white/90 hover:bg-white/10 ${idx === 0 ? 'rounded-t-lg' : ''} ${idx === filteredCommands.length - 1 ? 'rounded-b-lg' : ''}`}
+                onMouseDown={() => handleCommandSelect(cmd.name)}
+              >
+                <span className="font-mono text-sm">{cmd.name}</span>
+                <span className="ml-2 text-xs text-white/50">{cmd.description}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </form>
-      <div className="text-xs text-white/40 px-6 pb-3 select-none">
-        💡 Type <span className="font-mono bg-white/10 px-1 py-0.5 rounded text-xs">/image</span> to generate an image
-      </div>
     </div>
   );
 };

@@ -45,7 +45,7 @@ export const ChatMessages: React.FC = () => {
   return (
     <div 
       ref={messagesContainerRef}
-      className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-[#111111]"
+      className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2 bg-[#111111]"
     >
       {messages.length === 0 ? (
         <div className="flex items-center justify-center h-full">

@@ -5,6 +5,8 @@ from app.routes.Llama import llamaRouter
 from app.routes.claude import claudeRouter
 from pydantic import BaseModel
 import uvicorn
+from fastapi.staticfiles import StaticFiles
+import os
 
 SYSTEM_MESSAGE = "Make sure you are kind, welcoming, accurate and precise in responding towards the prompts of the user. If asked about code, return beautiful code formatting"
 

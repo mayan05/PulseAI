@@ -48,9 +48,16 @@ interface CreateConversationBody {
 
 interface CreateMessageBody {
   content: string;
-  type: "TEXT" | "IMAGE";
+  type: "TEXT" | "IMAGE" | "FILE";
   model: string;
   conversationId: string;
+  attachments?: {
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+    url: string;
+  }[];
 }
 
 interface AIResponse {
@@ -430,7 +437,7 @@ const server = Bun.serve({
         }
 
         const body = await req.json() as CreateMessageBody;
-        const { content, type, model, conversationId } = body;
+        const { content, type, model, conversationId, attachments } = body;
 
         // Log the incoming body for debugging
         console.log("Incoming message body:", body);
@@ -460,24 +467,56 @@ const server = Bun.serve({
             conversationId,
             content,
             role: 'USER',
+            attachments: attachments ? JSON.stringify(attachments) : null,
           }
         });
 
         // Get AI response
-        const aiResponse = await fetch(`http://localhost:8000/${model}/generate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: content,
-            temperature: 0.7,
-          }),
-        }).then(res => res.json()) as { text: string };
+        let aiResponse;
+        if (model === 'gpt' && attachments && Array.isArray(attachments) && attachments.length > 0 && attachments[0]?.type === 'application/pdf') {
+          // If it's a PDF, forward as FormData to /gpt/generate-form
+          const formData = new FormData();
+          formData.append('prompt', content);
+          formData.append('temperature', '0.7');
+          aiResponse = await fetch('http://localhost:8000/gpt/generate-form', {
+            method: 'POST',
+            body: formData,
+          }).then(res => res.json());
+        } else if (model === 'claude') {
+          // For Claude, always use FormData (supports file or just prompt)
+          const formData = new FormData();
+          formData.append('prompt', content);
+          formData.append('temperature', '0.7');
+          if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+            const fileAtt = attachments[0];
+            if (fileAtt && fileAtt.url && typeof fileAtt.url === 'string' && !fileAtt.url.startsWith('blob:')) {
+              const fileRes = await fetch(fileAtt.url);
+              const fileBlob = typeof Blob !== 'undefined' ? await fileRes.blob() : null;
+              if (fileBlob && typeof Blob !== 'undefined' && fileBlob instanceof Blob) {
+                formData.append('file', fileBlob, fileAtt.name);
+              }
+            }
+          }
+          aiResponse = await fetch('http://localhost:8000/claude/generate', {
+            method: 'POST',
+            body: formData,
+          }).then(res => res.json());
+        } else {
+          aiResponse = await fetch(`http://localhost:8000/${model}/generate`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              prompt: content,
+              temperature: 0.7,
+            }),
+          }).then(res => res.json());
+        }
 
         console.log('LLM Service Response:', aiResponse);
 
-        if (!aiResponse || !aiResponse.text) {
+        if (!aiResponse || typeof aiResponse.text !== 'string') {
           console.error('Invalid AI response:', aiResponse);
           throw new Error('Invalid AI response');
         }
@@ -485,7 +524,7 @@ const server = Bun.serve({
         // Create AI message
         const aiMessage = await prisma.message.create({
           data: {
-            content: aiResponse.text,
+            content: typeof aiResponse.text === 'string' ? aiResponse.text : '',
             type: 'TEXT',
             model,
             role: 'ASSISTANT',
@@ -501,11 +540,13 @@ const server = Bun.serve({
             ...userMessage,
             createdAt: userMessage.createdAt,
             timestamp: userMessage.createdAt,
+            attachments: userMessage.attachments ? JSON.parse(userMessage.attachments) : undefined,
           },
           aiMessage: {
             ...aiMessage,
             createdAt: aiMessage.createdAt,
             timestamp: aiMessage.createdAt,
+            content: typeof aiResponse.text === 'string' ? aiResponse.text : '',
           },
         };
 

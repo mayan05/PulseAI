@@ -5,10 +5,12 @@ import { Sidebar } from '@/components/Layout/Sidebar';
 import { ChatHeader } from '@/components/Chat/ChatHeader';
 import { ChatMessages } from '@/components/Chat/ChatMessages';
 import { ChatInput } from '@/components/Chat/ChatInput';
+import { useChatStore } from '@/store/chatStore';
 
 const Index = () => {
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
+  const loadChats = useChatStore((state) => state.loadChats);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const isResizing = useRef(false);
@@ -16,6 +18,12 @@ const Index = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
+
+  useEffect(() => {
+    if (token) {
+      loadChats();
+    }
+  }, [token, loadChats]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {

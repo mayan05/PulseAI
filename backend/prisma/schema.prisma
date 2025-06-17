@@ -32,17 +32,19 @@ model Conversation {
 model Message {
   id             String       @id @default(cuid())
   content        String       // For text messages, this is the text. For images, this is the URL
-  type           MessageType  // TEXT or IMAGE
+  type           MessageType  // TEXT, IMAGE, or FILE
   model          String       // The LLM model used (e.g., "gpt-4", "llama-3.3-70b", "claude-sonnet")
   role           MessageRole  // USER or ASSISTANT
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   createdAt      DateTime     @default(now())
+  attachments    String?      // JSON string of attachments array
 }
 
 enum MessageType {
   TEXT
   IMAGE
+  FILE
 }
 
 enum MessageRole {

@@ -8,6 +8,7 @@ export interface Attachment {
   type: string;
   size: number;
   url: string;
+  file?: File; // Allow passing the File object for PDF uploads
 }
 
 export interface Message {
@@ -72,31 +73,53 @@ export const useChatStore = create<ChatStore>()(
 
       loadChats: async () => {
         try {
+          // Check for localStorage data first
+          const localChats = localStorage.getItem('chat-storage');
+          if (localChats) {
+            const parsed = JSON.parse(localChats);
+            if (parsed && parsed.state && Array.isArray(parsed.state.chats) && parsed.state.chats.length > 0) {
+              set({ chats: parsed.state.chats, activeChat: parsed.state.activeChat });
+              return;
+            }
+          }
+          // Fallback to DB fetch
+          console.log('Loading chats from DB...');
           const isAuthenticated = useAuthStore.getState().isAuthenticated();
           if (!isAuthenticated) {
             console.log('Not authenticated, skipping chat load');
             return;
           }
-
           const token = localStorage.getItem('token');
           const response = await fetch(`${API_URL}/conversations`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
           });
-
           if (!response.ok) throw new Error('Failed to load chats');
-
           const conversations = await response.json();
-          // Ensure each chat has a messages array
-          const chatsWithMessages = conversations.map((chat: Omit<Chat, 'messages'> & { messages?: Message[] }) => ({
+          const chatsWithMessages = conversations.map((chat) => ({
             ...chat,
-            messages: chat.messages || [],
+            messages: (chat.messages || []).map(msg => ({
+              ...msg,
+              attachments: (() => {
+                let atts = [];
+                if (typeof msg.attachments === 'string') {
+                  try {
+                    atts = JSON.parse(msg.attachments);
+                  } catch {
+                    atts = [];
+                  }
+                } else if (Array.isArray(msg.attachments)) {
+                  atts = msg.attachments;
+                }
+                // Only keep objects with a string type property
+                return Array.isArray(atts)
+                  ? atts.filter(att => att && typeof att === 'object' && typeof att.type === 'string')
+                  : [];
+              })(),
+            })),
           }));
-          
           set({ chats: chatsWithMessages });
-          
-          // Set active chat to the most recent one if none is selected
           if (!get().activeChat && chatsWithMessages.length > 0) {
             set({ activeChat: chatsWithMessages[0].id });
           }
@@ -203,21 +226,21 @@ export const useChatStore = create<ChatStore>()(
       },
 
       addMessage: async (chatId: string, message: Omit<Message, 'id' | 'createdAt' | 'conversationId' | 'timestamp'>): Promise<void> => {
+        // Create optimistic message at the start of the function
+        const optimisticMessage: Message = {
+          id: `temp-${Date.now()}`,
+          ...message,
+          createdAt: new Date(),
+          timestamp: new Date(),
+          conversationId: chatId,
+        };
+
         try {
           // Get auth token
           const token = localStorage.getItem('token');
           if (!token) {
             throw new Error('Not authenticated');
           }
-
-          // Create optimistic message
-          const optimisticMessage: Message = {
-            id: `temp-${Date.now()}`,
-            ...message,
-            createdAt: new Date(),
-            timestamp: new Date(),
-            conversationId: chatId,
-          };
 
           // Update UI immediately with optimistic message
           set((state) => ({
@@ -234,7 +257,70 @@ export const useChatStore = create<ChatStore>()(
           // Set loading state for AI response
           set({ isLoading: true });
 
-          // Make API call in the background
+          // --- PDF/TXT FILE HANDLING FOR GPT/CLAUDE ---
+          const hasFile = Array.isArray(message.attachments) && message.attachments.some(att => att.type === 'application/pdf' || att.type === 'text/plain');
+          if (hasFile) {
+            const fileAttachment = message.attachments!.find(att => att.type === 'application/pdf' || att.type === 'text/plain');
+            if (!fileAttachment) throw new Error('No file attachment found');
+            const file = fileAttachment.file;
+            if (!file) throw new Error('File object missing in attachment');
+            const formData = new FormData();
+            formData.append('prompt', message.content);
+            formData.append('temperature', '0.7');
+            formData.append('file', file);
+            // Choose endpoint based on model
+            let endpoint = '';
+            if (message.model === 'claude') {
+              endpoint = 'http://localhost:8000/claude/generate';
+            } else {
+              endpoint = 'http://localhost:8000/gpt/generate-form';
+            }
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+              body: formData,
+            });
+            if (!response.ok) {
+              throw new Error('Failed to process file');
+            }
+            const data = await response.json();
+            // Add the real user and AI messages
+            const userMessage = {
+              ...optimisticMessage,
+              id: data.userMessage?.id || `user-${Date.now()}`,
+              createdAt: new Date(),
+              timestamp: new Date(),
+            };
+            const aiMessage = {
+              id: `ai-${Date.now()}`,
+              content: data.text || (data.aiMessage && data.aiMessage.text) || 'No response',
+              type: 'TEXT' as const,
+              model: message.model,
+              role: 'ASSISTANT' as const,
+              createdAt: new Date(),
+              timestamp: new Date(),
+              conversationId: chatId,
+            };
+            set((state) => ({
+              chats: state.chats.map((chat) =>
+                chat.id === chatId
+                  ? {
+                      ...chat,
+                      messages: (chat.messages || [])
+                        .filter((msg) => typeof msg.id === 'string' ? !msg.id.startsWith('temp-') : true)
+                        .concat([userMessage, aiMessage]),
+                    }
+                  : chat
+              ),
+            }));
+            set({ isLoading: false });
+            return;
+          }
+          // --- END FILE HANDLING ---
+
+          // Make API call in the background for all other messages
           const response = await fetch(`${API_URL}/messages`, {
             method: 'POST',
             headers: {
@@ -252,8 +338,6 @@ export const useChatStore = create<ChatStore>()(
           }
 
           const { userMessage, aiMessage } = await response.json();
-          console.log('API Response:', { userMessage, aiMessage });
-
           // Ensure messages have timestamp and are valid
           const messagesWithTimestamp = [userMessage, aiMessage]
             .filter((msg): msg is Message => {
@@ -263,26 +347,20 @@ export const useChatStore = create<ChatStore>()(
               }
               return isValid;
             })
-            .map(msg => {
-              const messageWithTimestamp = {
-                ...msg,
-                timestamp: msg.createdAt || new Date(),
-                createdAt: msg.createdAt || new Date(),
-              };
-              console.log('Processed message:', messageWithTimestamp);
-              return messageWithTimestamp;
-            });
+            .map(msg => ({
+              ...msg,
+              timestamp: new Date(msg.createdAt),
+              createdAt: new Date(msg.createdAt),
+            }));
 
-          console.log('Final messages to add:', messagesWithTimestamp);
-
-          // Replace optimistic message with real messages
+          // Replace all optimistic messages for this chat with real messages
           set((state) => ({
             chats: state.chats.map((chat) =>
               chat.id === chatId
                 ? {
                     ...chat,
                     messages: (chat.messages || [])
-                      .filter((msg) => msg.id !== optimisticMessage.id)
+                      .filter((msg) => typeof msg.id === 'string' ? !msg.id.startsWith('temp-') : true)
                       .concat(messagesWithTimestamp),
                   }
                 : chat
@@ -297,7 +375,7 @@ export const useChatStore = create<ChatStore>()(
                 ? {
                     ...chat,
                     messages: (chat.messages || [])
-                      .filter((msg) => msg.id !== `temp-${Date.now()}`),
+                      .filter((msg) => typeof msg.id === 'string' ? msg.id !== optimisticMessage.id : true),
                   }
                 : chat
             ),

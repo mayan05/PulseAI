@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Bot, Copy, Check, FileText, ExternalLink } from 'lucide-react';
+import { User, Bot, Copy, Check, FileText, ExternalLink, Download } from 'lucide-react';
 import { Message, Attachment } from '../../store/chatStore';
 import { Button } from '../ui/button';
 import { useState, useRef } from 'react';
@@ -77,6 +77,41 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const [showAttachments, setShowAttachments] = useState(false);
   const isUser = message.role === 'USER';
 
+  // Helper to check if content is an image URL or data URL
+  const isImageContent = (content: string | undefined | null) => {
+    if (!content) return false;
+    return (
+      typeof content === 'string' && content.startsWith('data:image/') ||
+      typeof content === 'string' && content.match(/^https?:\/\/.+\.(png|jpg|jpeg|gif|webp|svg)$/i)
+    );
+  };
+
+  // Helper to extract image URL from markdown if needed
+  const extractImageUrl = (content: string | undefined | null) => {
+    if (!content) return null;
+    const match = content.match(/!\[[^\]]*\]\(([^)]+)\)/);
+    if (match) return match[1];
+    if (isImageContent(content)) return content;
+    return null;
+  };
+
+  const imageUrl = extractImageUrl(message.content);
+
+  const handleOpenImage = () => {
+    if (imageUrl) {
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.target = '_blank';
+      // If it's a data URL, set a filename for download
+      if (typeof imageUrl === 'string' && imageUrl.startsWith('data:image/')) {
+        link.download = 'generated-image.png';
+      }
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
@@ -95,7 +130,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   };
 
   const openAttachmentPreview = (attachment: Attachment) => {
-    if (attachment.type.startsWith('image/')) {
+    if (attachment.type && typeof attachment.type === 'string' && attachment.type.startsWith('image/')) {
       setPreviewAttachment(attachment);
     } else {
       window.open(attachment.url, '_blank');
@@ -120,7 +155,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   };
 
   const renderAttachmentThumbnail = (attachment: Attachment) => {
-    if (attachment.type.startsWith('image/')) {
+    if (attachment.type && typeof attachment.type === 'string' && attachment.type.startsWith('image/')) {
       return (
         <div className="relative group w-full">
           <img
@@ -168,51 +203,79 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
   return (
     <>
-      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-1 message-animate`}>
-        <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start space-x-3 max-w-4xl group`}>
-          {/* Profile Avatar */}
-          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
-            isUser ? 'bg-white text-black ml-3 ring-2 ring-white/20' : 'bg-[#2a2a2a] text-[#e0e0e0] mr-3 ring-2 ring-white/10'
-          }`}>
-            {getUserInitials()}
-          </div>
-
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-0.5 message-animate`}>
+        <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start max-w-4xl group w-full`}>
           {/* Message Content */}
-          <div
-            className={`relative ${isUser ? 'message-user' : 'message-ai'} ${message.attachments && message.attachments.length > 0 && !message.content ? 'p-0' : 'px-4'} py-3 max-w-[85%] transition-all duration-200`}
-          >
-            {/* Text Content */}
-            <div className={`prose prose-sm max-w-none ${isUser ? '' : 'text-[#e0e0e0]'}`}>
+          {isUser ? (
+            <div
+              className={`bg-white text-black rounded-2xl px-4 py-2 max-w-[70%] shadow-md break-words whitespace-pre-line`}
+              style={{ wordBreak: 'break-word', marginRight: 0 }}
+            >
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                components={{
-                  code: CodeBlock,
-                }}
+                components={{ code: CodeBlock }}
               >
                 {message.content}
               </ReactMarkdown>
-            </div>
-            {/* Attachments */}
-            {message.attachments && message.attachments.length > 0 && (
-              <div className={`${message.content ? 'mt-3' : ''} space-y-2`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {message.attachments.map((attachment) => (
-                    <div key={attachment.id}>
-                      {renderAttachmentThumbnail(attachment)}
-                    </div>
-                  ))}
+              {/* Image style override for .prose */}
+              <style>{`
+                .prose img {
+                  max-width: 100% !important;
+                  height: auto !important;
+                  display: block !important;
+                  margin: 1rem auto !important;
+                  background: #222 !important;
+                  border-radius: 0.75rem !important;
+                  box-shadow: 0 2px 16px #0004;
+                }
+              `}</style>
+              {Array.isArray(message.attachments) && message.attachments.length > 0 && (
+                <div className={`${message.content ? 'mt-2' : ''} space-y-2`}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {message.attachments.map((attachment) => (
+                      <div key={attachment.id}>{renderAttachmentThumbnail(attachment)}</div>
+                    ))}
+                  </div>
                 </div>
+              )}
+            </div>
+          ) : (
+            <div className="w-full max-w-[70%] text-left px-0 py-0">
+              <div className={`prose prose-sm max-w-none text-[#e0e0e0] bg-transparent p-0 m-0`} style={{ margin: 0 }}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{ code: CodeBlock }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+                {/* Image style override for .prose */}
+                <style>{`
+                  .prose img {
+                    max-width: 100% !important;
+                    height: auto !important;
+                    display: block !important;
+                    margin: 1rem auto !important;
+                    background: #222 !important;
+                    border-radius: 0.75rem !important;
+                    box-shadow: 0 2px 16px #0004;
+                  }
+                `}</style>
               </div>
-            )}
-          </div>
+              {Array.isArray(message.attachments) && message.attachments.length > 0 && (
+                <div className={`${message.content ? 'mt-2' : ''} space-y-2`}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {message.attachments.map((attachment) => (
+                      <div key={attachment.id}>{renderAttachmentThumbnail(attachment)}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-      {/* Timestamp below bubble, aligned to sender */}
-      <div className={`mb-4 text-xs text-white/40 ${isUser ? 'text-right mr-12' : 'text-left pl-16'}`}>
-        {formatTime(message.createdAt)}
-      </div>
-
-      {message.attachments && message.attachments.length > 0 && (
+      <div className={`mb-2 text-xs text-white/40 ${isUser ? 'text-right mr-8' : 'text-left pl-4'}`}>{formatTime(message.createdAt)}</div>
+      {Array.isArray(message.attachments) && message.attachments.length > 0 && (
         <Dialog open={showAttachments} onOpenChange={setShowAttachments}>
           <DialogContent>
             <DialogHeader>
@@ -224,7 +287,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                   key={attachment.id}
                   className="flex items-center space-x-2 p-2 rounded-lg bg-muted"
                 >
-                  {attachment.type.startsWith('image/') ? (
+                  {attachment.type && typeof attachment.type === 'string' && attachment.type.startsWith('image/') ? (
                     <img
                       src={attachment.url}
                       alt={attachment.name}
