@@ -24,7 +24,7 @@ export interface Chat {
   updatedAt: Date;
 }
 
-export type LLMProvider = 'openai' | 'groq' | 'openrouter' | 'gpt4.1';
+export type LLMProvider = 'openai' | 'groq' | 'openrouter' | 'gpt4.1' | 'claude' | 'llama';
 
 interface ChatState {
   chats: Chat[];
@@ -58,7 +58,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   chats: [createDefaultChat()],
   activeChat: `chat_${Date.now()}`,
   isAuthenticated: false,
-  selectedProvider: 'gpt4.1',
+  selectedProvider: 'llama',
   isLoading: false,
 
   createChat: () => {

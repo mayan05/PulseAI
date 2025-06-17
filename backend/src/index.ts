@@ -294,6 +294,44 @@ const server = Bun.serve({
         }
       }
 
+      // Proxy endpoint for Claude microservice
+      if (url.pathname === "/claude/generate" && req.method === "POST") {
+        const user = await getUserFromRequest(req);
+        if (!user) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+        }
+
+        const response = await fetch("http://localhost:8000/claude/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(await req.json()),
+        });
+
+        const data = await response.json();
+        return new Response(JSON.stringify(data), { headers });
+      }
+
+      // Proxy endpoint for Llama microservice
+      if (url.pathname === "/llama/generate" && req.method === "POST") {
+        const user = await getUserFromRequest(req);
+        if (!user) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+        }
+
+        const response = await fetch("http://localhost:8000/llama/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(await req.json()),
+        });
+
+        const data = await response.json();
+        return new Response(JSON.stringify(data), { headers });
+      }
+
       // Handle unknown routes
       return new Response(
         JSON.stringify({ error: "Not found" }),

@@ -11,22 +11,25 @@ import {
 } from '../ui/dropdown-menu';
 
 const providers: { value: LLMProvider; label: string; description: string }[] = [
+  { value: 'llama', label: 'Llama', description: 'Fast and efficient Llama model' },
   { value: 'gpt4.1', label: 'GPT-4.1', description: 'Latest GPT model' },
   { value: 'openai', label: 'OpenAI GPT-4', description: 'Most capable model' },
   { value: 'groq', label: 'Groq Llama', description: 'Lightning fast inference' },
   { value: 'openrouter', label: 'OpenRouter', description: 'Multiple model access' },
+  { value: 'claude', label: 'Claude', description: 'Anthropic\'s Claude model' },
 ];
 
 export const ChatInput: React.FC = () => {
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showCommands, setShowCommands] = useState(false);
-  const { activeChat, addMessage, setLoading, isLoading, selectedProvider, setProvider } = useChatStore();
+  const { activeChat, addMessage, setLoading, isLoading, selectedProvider, setProvider, chats } = useChatStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
 
   const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
+  const currentChat = chats.find(chat => chat.id === activeChat);
 
   const commands = [
     { name: '/imagine', description: 'Generate an image' },
@@ -73,7 +76,29 @@ export const ChatInput: React.FC = () => {
     setLoading(true);
     
     try {
-      if (selectedProvider === 'gpt4.1') {
+      if (selectedProvider === 'llama') {
+        const response = await fetch('http://localhost:8000/llama/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: message.trim(),
+            temperature: 0.7,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate response');
+        }
+
+        const data = await response.json();
+        
+        addMessage(activeChat, {
+          content: data.text,
+          role: 'assistant',
+        });
+      } else if (selectedProvider === 'gpt4.1') {
         const response = await fetch('http://localhost:8000/gpt/generate', {
           method: 'POST',
           headers: {
@@ -82,6 +107,31 @@ export const ChatInput: React.FC = () => {
           body: JSON.stringify({
             prompt: message.trim(),
             temperature: 0.5,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate response');
+        }
+
+        const data = await response.json();
+        
+        addMessage(activeChat, {
+          content: data.text,
+          role: 'assistant',
+        });
+      } else if (selectedProvider === 'claude') {
+        const response = await fetch('http://localhost:8000/claude/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: message.trim(),
+            history: currentChat?.messages.map(msg => ({
+              role: msg.role,
+              content: msg.content
+            })) || [],
           }),
         });
 
