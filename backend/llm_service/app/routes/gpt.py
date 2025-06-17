@@ -43,11 +43,7 @@ async def extract_file_content(file: UploadFile) -> str:
         return f"[File: {file.filename} (type: {file.content_type})]"
 
 @router.post("/generate", response_class=JSONResponse)
-async def generate_text(
-    prompt: str = Form(...),
-    temperature: float = Form(0.7),
-    file: UploadFile = File(None)
-):
+async def generate_text(data: GenerateRequest):
     try:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -58,27 +54,13 @@ async def generate_text(
             
         client = OpenAI(api_key=api_key)
         
-        messages = [{"role": "user", "content": prompt}]
-        
-        # If file is provided, read its content and add to messages
-        if file:
-            try:
-                file_text = await extract_file_content(file)
-                messages.append({
-                    "role": "user",
-                    "content": f"Here's the file content:\n\n{file_text}"
-                })
-            except Exception as file_error:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Error processing file: {str(file_error)}"
-                )
+        messages = [{"role": "user", "content": data.prompt}]
         
         # Call OpenAI API
         response = client.chat.completions.create(
             model="gpt-4",
             messages=messages,
-            temperature=temperature
+            temperature=data.temperature
         )
         
         return JSONResponse(content={

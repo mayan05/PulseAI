@@ -41,6 +41,24 @@ interface LoginBody {
   password: string;
 }
 
+// Chat interfaces
+interface CreateConversationBody {
+  title: string;
+}
+
+interface CreateMessageBody {
+  content: string;
+  type: "TEXT" | "IMAGE";
+  model: string;
+  conversationId: string;
+}
+
+interface AIResponse {
+  text: string;
+  model: string;
+  timestamp: string;
+}
+
 const server = Bun.serve({
   port: 3000,
   async fetch(req) {
@@ -332,6 +350,210 @@ const server = Bun.serve({
         return new Response(JSON.stringify(data), { headers });
       }
 
+      // Chat endpoints
+      // POST /conversations - create new conversation
+      if (url.pathname === "/conversations" && req.method === "POST") {
+        const user = await getUserFromRequest(req);
+        if (!user) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+        }
+
+        const body = await req.json() as CreateConversationBody;
+        const { title } = body;
+
+        const conversation = await prisma.conversation.create({
+          data: {
+            title: title || 'New Chat',
+            userId: user.id,
+          },
+        });
+
+        return new Response(JSON.stringify(conversation), { headers });
+      }
+
+      // GET /conversations - get all conversations
+      if (url.pathname === "/conversations" && req.method === "GET") {
+        const user = await getUserFromRequest(req);
+        if (!user) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+        }
+
+        const conversations = await prisma.conversation.findMany({
+          where: {
+            userId: user.id,
+          },
+          include: {
+            messages: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+        });
+
+        return new Response(JSON.stringify(conversations), { headers });
+      }
+
+      // GET /conversations/:id - get a specific conversation
+      if (url.pathname.match(/^\/conversations\/[^/]+$/) && req.method === "GET") {
+        const user = await getUserFromRequest(req);
+        if (!user) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+        }
+
+        const id = url.pathname.split("/")[2];
+        const conversation = await prisma.conversation.findUnique({
+          where: {
+            id,
+            userId: user.id,
+          },
+          include: {
+            messages: {
+              orderBy: {
+                createdAt: "asc",
+              },
+            },
+          },
+        });
+
+        if (!conversation) {
+          return new Response(JSON.stringify({ error: "Conversation not found" }), { status: 404, headers });
+        }
+
+        return new Response(JSON.stringify(conversation), { headers });
+      }
+
+      // POST /messages - create new message
+      if (url.pathname === "/messages" && req.method === "POST") {
+        const user = await getUserFromRequest(req);
+        if (!user) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+        }
+
+        const body = await req.json() as CreateMessageBody;
+        const { content, type, model, conversationId } = body;
+
+        // Log the incoming body for debugging
+        console.log("Incoming message body:", body);
+
+        // Validate required fields
+        if (!content || !type || !model || !conversationId) {
+          return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400, headers });
+        }
+
+        // Verify the conversation belongs to the user
+        const conversation = await prisma.conversation.findFirst({
+          where: {
+            id: conversationId,
+            userId: user.id,
+          },
+        });
+
+        if (!conversation) {
+          return new Response(JSON.stringify({ error: "Conversation not found" }), { status: 404, headers });
+        }
+
+        // Create user message
+        const userMessage = await prisma.message.create({
+          data: {
+            type,
+            model,
+            conversationId,
+            content,
+            role: 'USER',
+          }
+        });
+
+        // Get AI response
+        const aiResponse = await fetch(`http://localhost:8000/${model}/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: content,
+            temperature: 0.7,
+          }),
+        }).then(res => res.json()) as { text: string };
+
+        console.log('LLM Service Response:', aiResponse);
+
+        if (!aiResponse || !aiResponse.text) {
+          console.error('Invalid AI response:', aiResponse);
+          throw new Error('Invalid AI response');
+        }
+
+        // Create AI message
+        const aiMessage = await prisma.message.create({
+          data: {
+            content: aiResponse.text,
+            type: 'TEXT',
+            model,
+            role: 'ASSISTANT',
+            conversationId,
+          },
+        });
+
+        console.log('Created AI message:', aiMessage);
+
+        // Ensure both messages have the required fields
+        const response = {
+          userMessage: {
+            ...userMessage,
+            createdAt: userMessage.createdAt,
+            timestamp: userMessage.createdAt,
+          },
+          aiMessage: {
+            ...aiMessage,
+            createdAt: aiMessage.createdAt,
+            timestamp: aiMessage.createdAt,
+          },
+        };
+
+        console.log('Sending response:', response);
+        return new Response(JSON.stringify(response), { 
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        });
+      }
+
+      // DELETE /conversations/:id - delete conversation
+      if (url.pathname.match(/^\/conversations\/[^/]+$/) && req.method === "DELETE") {
+        const user = await getUserFromRequest(req);
+        if (!user) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+        }
+
+        const id = url.pathname.split('/')[2];
+
+        // Verify the conversation belongs to the user
+        const conversation = await prisma.conversation.findFirst({
+          where: {
+            id,
+            userId: user.id,
+          },
+        });
+
+        if (!conversation) {
+          return new Response(JSON.stringify({ error: "Conversation not found" }), { status: 404, headers });
+        }
+
+        // Delete all messages in the conversation
+        await prisma.message.deleteMany({
+          where: { conversationId: id },
+        });
+
+        // Delete the conversation
+        await prisma.conversation.delete({
+          where: { id },
+        });
+
+        return new Response(JSON.stringify({ success: true }), { headers });
+      }
+
       // Handle unknown routes
       return new Response(
         JSON.stringify({ error: "Not found" }),
@@ -347,4 +569,4 @@ const server = Bun.serve({
   },
 });
 
-console.log(`🚀 Server running at http://localhost:${server.port}`);
+console.log(`Server running at http://localhost:${server.port}`);
