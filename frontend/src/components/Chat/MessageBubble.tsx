@@ -2,10 +2,12 @@ import React from 'react';
 import { User, Bot, Copy, Check, FileText, ExternalLink } from 'lucide-react';
 import { Message, Attachment } from '../../store/chatStore';
 import { Button } from '../ui/button';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import vscDarkPlus from 'react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus';
 
 interface MessageBubbleProps {
   message: Message;
@@ -17,6 +19,56 @@ interface AttachmentPreview {
   type: string;
   url: string;
 }
+
+// Custom CodeBlock component with copy button
+const CodeBlock: React.FC<{ inline?: boolean; className?: string; children: React.ReactNode }> = ({ inline, className, children, ...props }) => {
+  const [copied, setCopied] = useState(false);
+  const codeRef = useRef<HTMLPreElement>(null);
+  const codeString = String(children).replace(/\n$/, ''); 
+  // Extract language from className (e.g., language-python)
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match ? match[1] : '';
+
+  if (inline) {
+    // Plain inline code, no copy button or extra styling
+    return <code className="px-1 py-0.5 rounded bg-white/10 text-white/90 text-xs font-mono">{children}</code>;
+  }
+  // If the code block is only one line, render as inline code style (no copy button)
+  if (!codeString.includes('\n')) {
+    return <code className="px-1 py-0.5 rounded bg-white/10 text-white/90 text-xs font-mono">{codeString}</code>;
+  }
+  return (
+    <div className="relative group mt-2 mb-4">
+      {/* Removed language badge */}
+      <SyntaxHighlighter
+        ref={codeRef}
+        language={language}
+        style={vscDarkPlus}
+        showLineNumbers={false} // Removed line numbers
+        customStyle={{
+          borderRadius: '0.75rem',
+          padding: '1.5rem 1rem 1rem 1rem', // removed extra left padding for line numbers
+          fontSize: '0.95em',
+          background: '#18181b',
+          margin: 0,
+        }}
+      >
+        {codeString}
+      </SyntaxHighlighter>
+      <button
+        className="absolute top-2 right-2 p-1 rounded bg-black/40 hover:bg-black/70 text-white transition-opacity opacity-0 group-hover:opacity-100"
+        onClick={() => {
+          navigator.clipboard.writeText(codeString);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        }}
+        title="Copy code"
+      >
+        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+};
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const [copied, setCopied] = useState(false);
@@ -70,17 +122,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     } else {
       return (
         <div 
-          className="flex items-center space-x-3 p-3 bg-background/50 rounded-xl border border-border cursor-pointer hover:bg-background/70 transition-colors max-w-64 shadow-sm"
+          className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/20 backdrop-blur-md shadow-lg border border-white/30 transition hover:bg-white/30 cursor-pointer group max-w-64"
           onClick={() => openAttachmentPreview(attachment)}
         >
-          <FileText className="w-8 h-8 text-muted-foreground flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium truncate">{attachment.name}</div>
-            <div className="text-xs text-muted-foreground">
-              {(attachment.size / 1024 / 1024).toFixed(1)} MB
-            </div>
+          <FileText className="w-6 h-6 text-blue-400 flex-shrink-0" />
+          <div className="flex flex-col min-w-0">
+            <span className="font-medium text-white truncate max-w-[120px]">{attachment.name}</span>
+            <span className="text-xs text-white/70">{(attachment.size / 1024).toFixed(1)} KB</span>
           </div>
-          <ExternalLink className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <span className="ml-2 px-2 py-0.5 rounded bg-blue-500/80 text-xs text-white font-semibold uppercase">{attachment.type.split('/')[1] || 'file'}</span>
+          <ExternalLink className="w-4 h-4 text-white/70 opacity-0 group-hover:opacity-100 transition-opacity ml-2" />
         </div>
       );
     }
@@ -110,7 +161,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           >
             {/* Text Content */}
             <div className={`prose prose-sm max-w-none ${isUser ? '' : 'text-[#e0e0e0]'}`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code: CodeBlock,
+                }}
+              >
                 {message.content}
               </ReactMarkdown>
             </div>
@@ -126,23 +182,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 </div>
               </div>
             )}
-            {/* Message Actions (copy) - top right, only on hover */}
-            <div className="absolute top-2 right-2 flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopy}
-                className={`h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity ${
-                  isUser ? 'hover:bg-black/10 text-black/70' : 'hover:bg-white/5 text-[#e0e0e0]'
-                }`}
-              >
-                {copied ? (
-                  <Check className="w-3 h-3" />
-                ) : (
-                  <Copy className="w-3 h-3" />
-                )}
-              </Button>
-            </div>
           </div>
         </div>
       </div>

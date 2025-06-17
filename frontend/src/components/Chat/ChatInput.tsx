@@ -210,26 +210,16 @@ export const ChatInput: React.FC = () => {
         {/* Attachment chip UI - show above input if a file is selected */}
         {selectedFile && (
           <div className="flex items-center z-20 mb-2">
-            <div className="bg-white/10 text-white/80 px-3 py-1 rounded-lg flex items-center shadow border border-white/10 cursor-pointer hover:bg-white/20 transition-all"
-              onClick={() => {
-                // For images or PDFs, open a preview; otherwise, download
-                const fileURL = URL.createObjectURL(selectedFile);
-                if (selectedFile.type === 'application/pdf' || selectedFile.type.startsWith('image/')) {
-                  window.open(fileURL, '_blank');
-                } else {
-                  const a = document.createElement('a');
-                  a.href = fileURL;
-                  a.download = selectedFile.name;
-                  a.click();
-                }
-              }}
-              title="Click to preview/download"
-            >
+            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/20 backdrop-blur-md shadow-lg border border-white/30 transition hover:bg-white/30 cursor-pointer group">
               {getFileIcon(selectedFile.type)}
-              <span className="ml-2 truncate max-w-[160px]">{selectedFile.name}</span>
+              <div className="flex flex-col">
+                <span className="font-medium text-white truncate max-w-[160px]">{selectedFile.name}</span>
+                <span className="text-xs text-white/70">{(selectedFile.size / 1024).toFixed(1)} KB</span>
+              </div>
+              <span className="ml-2 px-2 py-0.5 rounded bg-blue-500/80 text-xs text-white font-semibold uppercase">{selectedFile.type.split('/')[1] || 'file'}</span>
               <button
                 type="button"
-                className="ml-2 text-white/50 hover:text-white focus:outline-none"
+                className="ml-2 text-white/60 hover:text-red-400 transition"
                 onClick={e => {
                   e.stopPropagation();
                   setSelectedFile(null);
