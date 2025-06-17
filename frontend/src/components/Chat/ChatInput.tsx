@@ -17,7 +17,7 @@ const providers: { value: LLMProvider; label: string; description: string }[] = 
     description: 'Best for detailed explanations & coding help'
   },
   { 
-    value: 'gpt4.1', 
+    value: 'gpt', 
     label: 'GPT-4', 
     description: 'Great at creative tasks & problem solving'
   },
@@ -37,6 +37,7 @@ export const ChatInput: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileUploadError, setFileUploadError] = useState<string | null>(null);
 
   const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
   const currentChat = chats.find(chat => chat.id === activeChat);
@@ -87,50 +88,71 @@ export const ChatInput: React.FC = () => {
     e.preventDefault();
     if (!message.trim() && !selectedFile || !activeChat) return;
 
-    const currentProvider = selectedProvider;
-
-    // Create FormData to send both text and file
-    const formData = new FormData();
-    formData.append("prompt", message);
-    formData.append("temperature", "0.7");
+    // Prepare attachments array if a file is selected
+    const attachments = [];
     if (selectedFile) {
-      formData.append("file", selectedFile);
+      attachments.push({
+        id: `${Date.now()}-${selectedFile.name}`,
+        name: selectedFile.name,
+        type: selectedFile.type,
+        size: selectedFile.size,
+        url: URL.createObjectURL(selectedFile),
+      });
     }
 
-    // Add message to UI immediately
+    // Add the user's message to the chat immediately, with attachments if any
     addMessage(activeChat, {
       role: "user",
-      content: message + (selectedFile ? `\n[Attached file: ${selectedFile.name}]` : ""),
+      content: message,
+      ...(attachments.length > 0 ? { attachments } : {}),
     });
 
     setMessage("");
     setSelectedFile(null);
     setLoading(true);
 
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/${currentProvider}/generate`, {
+    const currentProvider = selectedProvider;
+
+    let response;
+    if (currentProvider === 'llama') {
+      response = await fetch(`http://localhost:8000/llama/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: message,
+          temperature: 0.7,
+        }),
+      });
+    } else {
+      const formData = new FormData();
+      formData.append("prompt", message);
+      formData.append("temperature", "0.7");
+      if (selectedFile) {
+        formData.append("file", selectedFile);
+      }
+      response = await fetch(`http://localhost:8000/${currentProvider}/generate`, {
         method: "POST",
         body: formData,
       });
+    }
 
-      if (!response.ok) {
-        throw new Error("Failed to send message");
-      }
-
-      const data = await response.json();
-      addMessage(activeChat, {
-        role: "assistant",
-        content: data.text,
-      });
-    } catch (error) {
-      console.error("Error sending message:", error);
+    if (!response.ok) {
       addMessage(activeChat, {
         role: "assistant",
         content: "Sorry, I encountered an error while processing your request. Please try again.",
       });
-    } finally {
       setLoading(false);
+      return;
     }
+
+    const data = await response.json();
+    addMessage(activeChat, {
+      role: "assistant",
+      content: data.text,
+    });
+    setLoading(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -148,8 +170,18 @@ export const ChatInput: React.FC = () => {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (selectedProvider === 'llama') {
+      setFileUploadError('File upload is only supported for GPT-4 and Claude.');
+      setSelectedFile(null);
+      return;
+    }
+    setFileUploadError(null);
     if (file) {
       setSelectedFile(file);
+      // Automatically switch to GPT when a file is selected and provider is Claude or GPT
+      if (selectedProvider !== 'gpt' && selectedProvider !== 'claude') {
+        setProvider('gpt');
+      }
     }
   };
 
@@ -174,23 +206,82 @@ export const ChatInput: React.FC = () => {
 
   return (
     <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-white/10">
-      <form onSubmit={handleSubmit} className="container max-w-4xl mx-auto p-4">
+      <form onSubmit={handleSubmit} className="container max-w-4xl mx-auto p-4 flex flex-col gap-2">
+        {/* Attachment chip UI - show above input if a file is selected */}
+        {selectedFile && (
+          <div className="flex items-center z-20 mb-2">
+            <div className="bg-white/10 text-white/80 px-3 py-1 rounded-lg flex items-center shadow border border-white/10 cursor-pointer hover:bg-white/20 transition-all"
+              onClick={() => {
+                // For images or PDFs, open a preview; otherwise, download
+                const fileURL = URL.createObjectURL(selectedFile);
+                if (selectedFile.type === 'application/pdf' || selectedFile.type.startsWith('image/')) {
+                  window.open(fileURL, '_blank');
+                } else {
+                  const a = document.createElement('a');
+                  a.href = fileURL;
+                  a.download = selectedFile.name;
+                  a.click();
+                }
+              }}
+              title="Click to preview/download"
+            >
+              {getFileIcon(selectedFile.type)}
+              <span className="ml-2 truncate max-w-[160px]">{selectedFile.name}</span>
+              <button
+                type="button"
+                className="ml-2 text-white/50 hover:text-white focus:outline-none"
+                onClick={e => {
+                  e.stopPropagation();
+                  setSelectedFile(null);
+                }}
+                title="Remove attachment"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
         <div className="relative flex items-center">
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileSelect}
             className="hidden"
+            disabled={selectedProvider === 'llama'}
           />
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="absolute left-2 text-white/70 hover:text-white hover:bg-white/10"
-            onClick={() => fileInputRef.current?.click()}
+            className={`absolute left-2 text-white/70 hover:text-white hover:bg-white/10 ${
+              selectedProvider === 'llama' ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            onClick={() => {
+              if (selectedProvider === 'llama') {
+                setFileUploadError('File upload is only supported for GPT-4 and Claude.');
+                return;
+              }
+              setFileUploadError(null);
+              fileInputRef.current?.click();
+            }}
+            disabled={selectedProvider === 'llama'}
           >
             <Paperclip className="h-5 w-5" />
           </Button>
+          
+          {/* Show error if file upload is not allowed */}
+          {fileUploadError && (
+            <div className="absolute left-12 bottom-full mb-2 bg-red-600 text-white px-2 py-1 rounded text-sm flex items-center z-10">
+              <span>{fileUploadError}</span>
+              <button
+                type="button"
+                className="ml-2 text-white/80 hover:text-white"
+                onClick={() => setFileUploadError(null)}
+              >
+                ×
+              </button>
+            </div>
+          )}
           
           <textarea
             value={message}
@@ -207,19 +298,6 @@ export const ChatInput: React.FC = () => {
             rows={1}
           />
           
-          {selectedFile && (
-            <div className="absolute left-12 bottom-full mb-2 bg-white/10 text-white/70 px-2 py-1 rounded text-sm flex items-center">
-              <span className="truncate max-w-[200px]">{selectedFile.name}</span>
-              <button
-                type="button"
-                className="ml-2 text-white/50 hover:text-white"
-                onClick={() => setSelectedFile(null)}
-              >
-                ×
-              </button>
-            </div>
-          )}
-
           <div className="absolute right-2 flex items-center space-x-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

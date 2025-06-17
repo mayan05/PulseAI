@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Response
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi.responses import JSONResponse
 from datetime import datetime
 from anthropic import Anthropic
 from pydantic import BaseModel
@@ -37,27 +38,11 @@ async def extract_file_content(file: UploadFile) -> str:
         # For other file types, return file info
         return f"[File: {file.filename} (type: {file.content_type})]"
 
-@claudeRouter.post("/generate", 
-    summary="Generate response from Claude",
-    response_class=Response,
-    responses={
-        200: {
-            "content": {
-                "application/json": {
-                    "example": {
-                        "text": "Response text",
-                        "model": "claude-sonnet-4-20250514",
-                        "timestamp": "2024-03-21T12:00:00"
-                    }
-                }
-            }
-        }
-    }
-)
+@claudeRouter.post("/generate", response_class=JSONResponse)
 async def claudeTime(
-    prompt: str = Form(..., description="Your message to Claude"),
-    temperature: float = Form(0.7, description="Temperature for response generation"),
-    file: UploadFile = File(None, description="Upload a file (PDF, text, etc.)", media_type="multipart/form-data")
+    prompt: str = Form(...),
+    temperature: float = Form(0.7),
+    file: UploadFile = File(None)
 ):
     global claude_history
     try:
@@ -98,13 +83,14 @@ async def claudeTime(
             "content": ass_msg
         })
 
-        return {
+        return JSONResponse(content={
             "text": ass_msg,
             "model": "claude-sonnet-4-20250514",
             "timestamp": datetime.now().isoformat()
-        }
+        })
 
     except Exception as e:
+        print(f"Error details: {str(e)}")  # Add detailed logging
         raise HTTPException(
             status_code=500,
             detail=f"Internal Server Error: {str(e)}"

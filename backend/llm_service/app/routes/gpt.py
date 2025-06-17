@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Response
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi.responses import JSONResponse
 from openai import OpenAI
 from pydantic import BaseModel
 import os
@@ -33,27 +34,11 @@ async def extract_file_content(file: UploadFile) -> str:
         # For other file types, return file info
         return f"[File: {file.filename} (type: {file.content_type})]"
 
-@router.post("/generate",
-    summary="Generate response from GPT-4",
-    response_class=Response,
-    responses={
-        200: {
-            "content": {
-                "application/json": {
-                    "example": {
-                        "text": "Response text",
-                        "model": "gpt-4",
-                        "timestamp": "2024-03-21T12:00:00"
-                    }
-                }
-            }
-        }
-    }
-)
+@router.post("/generate", response_class=JSONResponse)
 async def generate_text(
-    prompt: str = Form(..., description="Your message to GPT-4"),
-    temperature: float = Form(0.7, description="Temperature for response generation"),
-    file: UploadFile = File(None, description="Upload a file (PDF, text, etc.)", media_type="multipart/form-data")
+    prompt: str = Form(...),
+    temperature: float = Form(0.7),
+    file: UploadFile = File(None)
 ):
     try:
         api_key = os.getenv("OPENAI_API_KEY")
@@ -88,11 +73,11 @@ async def generate_text(
             temperature=temperature
         )
         
-        return {
+        return JSONResponse(content={
             "text": response.choices[0].message.content,
             "model": "gpt-4",
             "timestamp": datetime.now().isoformat()
-        }
+        })
     except Exception as e:
         raise HTTPException(
             status_code=500,

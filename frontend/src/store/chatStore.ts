@@ -24,7 +24,7 @@ export interface Chat {
   updatedAt: Date;
 }
 
-export type LLMProvider = 'claude' | 'gpt4.1' | 'llama';
+export type LLMProvider = 'claude' | 'gpt' | 'llama';
 
 interface ChatState {
   chats: Chat[];

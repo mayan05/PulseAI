@@ -24,7 +24,7 @@ llama_history = [
 ]
 
 @llamaRouter.post("/generate")
-async def llamaTime(data : GenerateRequest):
+async def llamaTime(data: GenerateRequest):
     global llama_history
     try:
         # Add user message to history
@@ -35,28 +35,28 @@ async def llamaTime(data : GenerateRequest):
     
         # Get response from API
         response = llama.chat.completions.create(
-         model="llama-3.3-70b-versatile",
+            model="llama-3.3-70b-versatile",
             messages=llama_history,
             temperature=data.temperature
         )
     
         # Extract assistant's response
-        assitant_msg = response.choices[0].message.content
+        assistant_msg = response.choices[0].message.content
     
         # Add assistant's response to history
         llama_history.append({
             "role": "assistant",
-            "content": assitant_msg
+            "content": assistant_msg
         })
     
         return {
-                "text": assitant_msg,
-                "model": "llama-3.3-70b-versatile",
-                "timestamp": datetime.now().isoformat()
-            }
+            "text": assistant_msg,
+            "model": "llama-3.3-70b-versatile",
+            "timestamp": datetime.now().isoformat()
+        }
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Interal Server Error: {str(e)}"
+            detail=f"Internal Server Error: {str(e)}"
         ) 
    
