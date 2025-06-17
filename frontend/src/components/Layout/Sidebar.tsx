@@ -1,7 +1,10 @@
 import React from 'react';
-import { User, Plus, LogOut, Sparkles, Trash2 } from 'lucide-react';
+import { User, Plus, LogOut, Sparkles, Trash2, Settings, MessageSquare } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useChatStore } from '../../store/chatStore';
+import { useAuthStore } from '../../store/auth';
+import { useNavigate } from 'react-router-dom';
+import { Chat } from '../../store/chatStore';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -15,14 +18,52 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, user }) => {
   const { chats, activeChat, setActiveChat, createChat, deleteChat } = useChatStore();
+  const { logout } = useAuthStore();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
-    // Implement logout logic
+    logout();
+    navigate('/login');
   };
 
-  const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
-    e.stopPropagation();
-    deleteChat(chatId);
+  const handleNewChat = async () => {
+    const newChat = await createChat();
+    if (newChat) {
+      setActiveChat(newChat.id);
+      // Focus on the input after a short delay to ensure the chat is created
+      setTimeout(() => {
+        const input = document.querySelector('textarea');
+        if (input) {
+          input.focus();
+        }
+      }, 100);
+    }
+  };
+
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+      await deleteChat(chatId);
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+    }
+  };
+
+  const formatDate = (date: string | Date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const getLastMessage = (chat: Chat) => {
+    if (!chat.messages || chat.messages.length === 0) {
+      return {
+        content: 'No messages yet',
+        createdAt: new Date()
+      };
+    }
+    return chat.messages[chat.messages.length - 1];
   };
 
   return (
@@ -51,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, user }) => {
       {/* New Chat Button */}
       <div className="p-4">
         <Button
-          onClick={createChat}
+          onClick={handleNewChat}
           className="w-full justify-start bg-white hover:bg-white/90 text-black shadow-lg hover:shadow-xl transition-all duration-200"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -96,7 +137,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, user }) => {
                     </div>
                     <button
                       type="button"
-                      onClick={e => handleDeleteChat(e, chat.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteChat(chat.id);
+                      }}
                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto text-white/30 hover:text-red-400 hover:bg-red-400/10 rounded"
                       tabIndex={0}
                     >
@@ -104,13 +148,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, user }) => {
                     </button>
                   </div>
                   <p className="text-xs text-white/40 truncate mt-1">
-                    {chat.messages.length} messages
+                    {getLastMessage(chat).content}
+                  </p>
+                  <p className="text-xs text-white/50 max-w-[200px]">
+                    {formatDate(getLastMessage(chat).createdAt)}
                   </p>
                 </div>
               </div>
             </div>
           ))
         )}
+      </div>
+
+      <div className="p-4 border-t border-gray-800">
+        <button
+          onClick={() => navigate('/settings')}
+          className="w-full text-left text-gray-300 hover:text-white py-2 px-4 rounded-lg flex items-center gap-2"
+        >
+          <Settings size={20} />
+          Settings
+        </button>
+        <button
+          onClick={handleLogout}
+          className="w-full text-left text-gray-300 hover:text-white py-2 px-4 rounded-lg flex items-center gap-2"
+        >
+          <LogOut size={20} />
+          Logout
+        </button>
       </div>
     </div>
   );

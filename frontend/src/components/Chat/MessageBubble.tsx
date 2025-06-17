@@ -75,7 +75,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const [previewAttachment, setPreviewAttachment] = useState<AttachmentPreview | null>(null);
   const [showTimestamp, setShowTimestamp] = useState(false);
   const [showAttachments, setShowAttachments] = useState(false);
-  const isUser = message.role === 'user';
+  const isUser = message.role === 'USER';
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -209,7 +209,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       </div>
       {/* Timestamp below bubble, aligned to sender */}
       <div className={`mb-4 text-xs text-white/40 ${isUser ? 'text-right mr-12' : 'text-left pl-16'}`}>
-        {formatTime(message.timestamp)}
+        {formatTime(message.createdAt)}
       </div>
 
       {message.attachments && message.attachments.length > 0 && (

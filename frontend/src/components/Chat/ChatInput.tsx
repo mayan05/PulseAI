@@ -32,7 +32,7 @@ export const ChatInput: React.FC = () => {
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showCommands, setShowCommands] = useState(false);
-  const { activeChat, addMessage, setLoading, isLoading, selectedProvider, setProvider, chats } = useChatStore();
+  const { activeChat, addMessage, setLoading, isLoading, selectedProvider, setProvider, chats, createChat, setActiveChat } = useChatStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -85,140 +85,81 @@ export const ChatInput: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() && !selectedFile || !activeChat) return;
-
-    // Check if this is an image generation request
-    if (message.startsWith('/image')) {
-      const prompt = message.slice('/image'.length).trim();
-      if (!prompt) {
-        addMessage(activeChat, {
-          role: "assistant",
-          content: "Please provide a description for the image you want to generate.",
-        });
+    // Save the current message value before clearing
+    const msg = message;
+    const currentActiveChat = activeChat;
+    console.log('handleSubmit called with:', { msg, activeChat: currentActiveChat });
+    
+    // If there's a file selected, handle file upload
+    if (selectedFile) {
+      const fileType = selectedFile.type.toLowerCase();
+      const isPdf = fileType === 'application/pdf';
+      const isText = fileType === 'text/plain';
+      
+      if (!isPdf && !isText) {
+        setFileUploadError('Only PDF and TXT files are supported.');
         return;
       }
 
-      // Add the user's message to the chat
-      addMessage(activeChat, {
-        role: "user",
-        content: message,
-      });
+      // Clear input immediately for better UX
+      setMessage('');
+      setSelectedFile(null);
 
-      setMessage("");
-      setLoading(true);
-      setGeneratingImage(true);
-
-      try {
-        const response = await fetch('http://localhost:8000/gpt/generate-image', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt,
-            size: "1024x1024",
-            quality: "standard",
-            style: "natural",
-            n: 1
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to generate image');
+      if (!currentActiveChat) {
+        // Create chat and send message in parallel
+        const newChat = await createChat();
+        if (newChat && newChat.id) {
+          setActiveChat(newChat.id);
+          addMessage(newChat.id, {
+            content: `Uploaded file: ${selectedFile.name}`,
+            type: 'FILE',
+            model: selectedProvider,
+            role: 'USER',
+            fileType: isPdf ? 'pdf' : 'txt',
+            fileName: selectedFile.name,
+          });
         }
-
-        const data = await response.json();
-        
-        // Add the generated image to the chat
-        addMessage(activeChat, {
-          role: "assistant",
-          content: "Here's your generated image:",
-          attachments: [{
-            id: Date.now().toString(),
-            name: "generated-image.png",
-            type: "image/png",
-            url: data.image_url,
-            size: 0 // Size will be determined when the image is loaded
-          }]
+      } else {
+        addMessage(currentActiveChat, {
+          content: `Uploaded file: ${selectedFile.name}`,
+          type: 'FILE',
+          model: selectedProvider,
+          role: 'USER',
+          fileType: isPdf ? 'pdf' : 'txt',
+          fileName: selectedFile.name,
         });
-      } catch (error) {
-        addMessage(activeChat, {
-          role: "assistant",
-          content: "Sorry, I encountered an error while generating the image. Please try again.",
-        });
-      } finally {
-        setLoading(false);
-        setGeneratingImage(false);
       }
       return;
     }
 
-    // Handle regular chat messages
-    // Prepare attachments array if a file is selected
-    const attachments = [];
-    if (selectedFile) {
-      attachments.push({
-        id: `${Date.now()}-${selectedFile.name}`,
-        name: selectedFile.name,
-        type: selectedFile.type,
-        size: selectedFile.size,
-        url: URL.createObjectURL(selectedFile),
-      });
+    if (!msg.trim()) {
+      console.warn('Cannot send empty message');
+      return;
     }
 
-    // Add the user's message to the chat immediately, with attachments if any
-    addMessage(activeChat, {
-      role: "user",
-      content: message,
-      ...(attachments.length > 0 ? { attachments } : {}),
-    });
+    // Clear input immediately for better UX
+    setMessage('');
 
-    setMessage("");
-    setSelectedFile(null);
-    setLoading(true);
-
-    const currentProvider = selectedProvider;
-
-    let response;
-    if (currentProvider === 'llama') {
-      response = await fetch(`http://localhost:8000/llama/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: message,
-          temperature: 0.7,
-        }),
-      });
+    if (!currentActiveChat) {
+      // Create chat and send message in parallel
+      const newChat = await createChat();
+      if (newChat && newChat.id) {
+        setActiveChat(newChat.id);
+        addMessage(newChat.id, {
+          content: msg,
+          type: 'TEXT',
+          model: selectedProvider,
+          role: 'USER',
+        });
+      }
     } else {
-      const formData = new FormData();
-      formData.append("prompt", message);
-      formData.append("temperature", "0.7");
-      if (selectedFile) {
-        formData.append("file", selectedFile);
-      }
-      response = await fetch(`http://localhost:8000/${currentProvider}/generate`, {
-        method: "POST",
-        body: formData,
+      addMessage(currentActiveChat, {
+        content: msg,
+        type: 'TEXT',
+        model: selectedProvider,
+        role: 'USER',
       });
     }
-
-    if (!response.ok) {
-      addMessage(activeChat, {
-        role: "assistant",
-        content: "Sorry, I encountered an error while processing your request. Please try again.",
-      });
-      setLoading(false);
-      return;
-    }
-
-    const data = await response.json();
-    addMessage(activeChat, {
-      role: "assistant",
-      content: data.text,
-    });
-    setLoading(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -236,18 +177,30 @@ export const ChatInput: React.FC = () => {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check if file type is supported
+    const fileType = file.type.toLowerCase();
+    const isPdf = fileType === 'application/pdf';
+    const isText = fileType === 'text/plain';
+    
+    if (!isPdf && !isText) {
+      setFileUploadError('Only PDF and TXT files are supported.');
+      setSelectedFile(null);
+      return;
+    }
+
     if (selectedProvider === 'llama') {
       setFileUploadError('File upload is only supported for GPT-4 and Claude.');
       setSelectedFile(null);
       return;
     }
+
     setFileUploadError(null);
-    if (file) {
-      setSelectedFile(file);
-      // Automatically switch to GPT when a file is selected and provider is Claude or GPT
-      if (selectedProvider !== 'gpt' && selectedProvider !== 'claude') {
-        setProvider('gpt');
-      }
+    setSelectedFile(file);
+    // Automatically switch to GPT when a file is selected and provider is Claude or GPT
+    if (selectedProvider !== 'gpt' && selectedProvider !== 'claude') {
+      setProvider('gpt');
     }
   };
 

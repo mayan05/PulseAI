@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Bot } from 'lucide-react';
+import { Menu, Bot, Trash2 } from 'lucide-react';
 import { useChatStore } from '../../store/chatStore';
 import { Button } from '../ui/button';
 
@@ -15,38 +15,41 @@ interface ChatHeaderProps {
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({ onToggleSidebar, user }) => {
-  const { chats, activeChat } = useChatStore();
+  const { chats, activeChat, deleteChat } = useChatStore();
   const currentChat = chats.find(chat => chat.id === activeChat);
 
-  return (
-    <div className="flex items-center justify-between p-4 border-b border-white/10 bg-[#111111]">
-      <div className="flex items-center space-x-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onToggleSidebar}
-          className="md:hidden text-white/70 hover:text-white hover:bg-white/5"
-        >
-          <Menu className="w-5 h-5" />
-        </Button>
-        
-        <div className="flex items-center space-x-2">
-          <Bot className="w-5 h-5 text-white/70" />
-          <div>
-            <h2 className="font-semibold text-sm text-white">
-              {currentChat?.title || 'New Chat'}
-            </h2>
-            <p className="text-xs text-white/50">
-              {currentChat?.messages.length || 0} messages
-            </p>
-          </div>
-        </div>
-      </div>
+  const handleDelete = async () => {
+    if (activeChat) {
+      try {
+        await deleteChat(activeChat);
+      } catch (error) {
+        console.error('Error deleting chat:', error);
+      }
+    }
+  };
 
-      {/* App Name */}
-      <div className="text-xl font-bold text-white">
-        Pulse
+  if (!currentChat) {
+    return (
+      <div className="h-16 border-b border-gray-800 flex items-center justify-between px-4">
+        <h1 className="text-lg font-semibold">New Chat</h1>
       </div>
+    );
+  }
+
+  return (
+    <div className="h-16 border-b border-gray-800 flex items-center justify-between px-4">
+      <div>
+        <h1 className="text-lg font-semibold">{currentChat.title}</h1>
+        <p className="text-sm text-gray-400">
+          {currentChat.messages?.length || 0} messages
+        </p>
+      </div>
+      <button
+        onClick={handleDelete}
+        className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-red-400"
+      >
+        <Trash2 size={20} />
+      </button>
     </div>
   );
 };
