@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes.gpt import router
-from routes.Llama import llamaRouter 
-from routes.claude import claudeRouter
+from app.routes.gpt import router
+from app.routes.Llama import llamaRouter 
+from app.routes.claude import claudeRouter
 from pydantic import BaseModel
 import uvicorn
 

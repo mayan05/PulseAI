@@ -27,28 +27,33 @@ async def claudeTime(request: GenerateRequest):
             "content": request.prompt
         })
 
+        # Convert history to messages format
+        messages = []
+        for msg in claude_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+
         response = claude.messages.create(
             model="claude-sonnet-4-20250514",
             system=SYSTEM_MESSAGE,
-            messages=claude_history,
+            messages=messages,
             temperature=request.temperature,
             max_tokens=1024
         )
 
         ass_msg = response.content[0].text
         claude_history.append({
-            "role":"assistant",
+            "role": "assistant",
             "content": ass_msg
         })
 
         return {
-                "text": ass_msg,
-                "model": "claude-opus-4-20250514",
-                "timestamp": datetime.now().isoformat()
-            }
+            "text": ass_msg,
+            "model": "claude-sonnet-4-20250514",
+            "timestamp": datetime.now().isoformat()
+        }
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Interal Server Error: {str(e)}"
+            detail=f"Internal Server Error: {str(e)}"
         )
