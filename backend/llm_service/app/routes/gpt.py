@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
 from openai import OpenAI
-from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 from datetime import datetime
@@ -17,7 +16,7 @@ gpt_history = [{
 }]
 
 @router.post("/generate")
-async def generate_text(request: GenerateRequest):
+async def gptTime(request: GenerateRequest):
     global gpt_history
     try:
         api_key = os.getenv("OPENAI_API_KEY")
@@ -57,5 +56,5 @@ async def generate_text(request: GenerateRequest):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error generating response: {str(e)}"
+            detail=f"Interal Server Error: {str(e)}"
         ) 

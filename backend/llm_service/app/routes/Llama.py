@@ -51,6 +51,6 @@ async def llamaTime(data : GenerateRequest):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error generating response: {str(e)}"
+            detail=f"Interal Server Error: {str(e)}"
         ) 
    
