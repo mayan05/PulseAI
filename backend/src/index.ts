@@ -252,7 +252,7 @@ const server = Bun.serve({
 
         const body = await req.json() as { 
           prompt: string;
-          model: "gpt" | "claude";
+          model: "gpt" | "claude" | "llama";
           temperature?: number;
         };
 

@@ -3,9 +3,15 @@ from groq import Groq
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
-from main import SYSTEM_MESSAGE, GenerateRequest
+from pydantic import BaseModel
 
 llamaRouter = APIRouter(prefix="/llama", tags=["llama"])
+
+SYSTEM_MESSAGE = "Make sure you are kind, welcoming, accurate and precise in responding towards the prompts of the user. Make sure you reply ASAP and dont keep the user waiting for your response for too long"
+
+class GenerateRequest(BaseModel):
+    prompt: str
+    temperature: float = 0.7
 
 load_dotenv()
 llama = Groq(api_key=os.getenv("GROQ_API_KEY"))

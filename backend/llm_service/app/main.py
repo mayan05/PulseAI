@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import gpt, Llama, claude
+from routes.gpt import router
+from routes.Llama import llamaRouter 
+from routes.claude import claudeRouter
 from pydantic import BaseModel
 import uvicorn
 
@@ -23,9 +25,9 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(gpt.router)
-app.include_router(Llama.llamaRouter)
-app.include_router(claude.claudeRouter)
+app.include_router(router)
+app.include_router(llamaRouter)
+app.include_router(claudeRouter)
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="localhost", port=8000, reload=True) 
+    uvicorn.run("main:app", host="localhost", port=8000, reload=True) 
