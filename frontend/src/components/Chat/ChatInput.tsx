@@ -11,12 +11,21 @@ import {
 } from '../ui/dropdown-menu';
 
 const providers: { value: LLMProvider; label: string; description: string }[] = [
-  { value: 'llama', label: 'Llama', description: 'Fast and efficient Llama model' },
-  { value: 'gpt4.1', label: 'GPT-4.1', description: 'Latest GPT model' },
-  { value: 'openai', label: 'OpenAI GPT-4', description: 'Most capable model' },
-  { value: 'groq', label: 'Groq Llama', description: 'Lightning fast inference' },
-  { value: 'openrouter', label: 'OpenRouter', description: 'Multiple model access' },
-  { value: 'claude', label: 'Claude', description: 'Anthropic\'s Claude model' },
+  { 
+    value: 'claude', 
+    label: 'Claude Sonnet', 
+    description: 'Best for detailed explanations & coding help'
+  },
+  { 
+    value: 'gpt4.1', 
+    label: 'GPT-4', 
+    description: 'Great at creative tasks & problem solving'
+  },
+  { 
+    value: 'llama', 
+    label: 'Llama 2', 
+    description: 'Quick responses • Efficient for simple tasks'
+  },
 ];
 
 export const ChatInput: React.FC = () => {
@@ -27,6 +36,7 @@ export const ChatInput: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
   const currentChat = chats.find(chat => chat.id === activeChat);
@@ -58,117 +68,65 @@ export const ChatInput: React.FC = () => {
     }
   }, [message]);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = `${Math.min(scrollHeight, 200)}px`;
+      
+      if (scrollHeight > 44) {
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [message]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !activeChat || isLoading) return;
+    if (!message.trim() && !selectedFile || !activeChat) return;
 
-    const userMessage = {
-      content: message.trim(),
-      role: 'user' as const,
-      attachments: attachments.length > 0 ? attachments : undefined,
-    };
+    const currentProvider = selectedProvider;
 
-    addMessage(activeChat, userMessage);
-    setMessage('');
-    setAttachments([]);
-    textareaRef.current?.focus();
+    // Create FormData to send both text and file
+    const formData = new FormData();
+    formData.append("prompt", message);
+    formData.append("temperature", "0.7");
+    if (selectedFile) {
+      formData.append("file", selectedFile);
+    }
 
+    // Add message to UI immediately
+    addMessage(activeChat, {
+      role: "user",
+      content: message + (selectedFile ? `\n[Attached file: ${selectedFile.name}]` : ""),
+    });
+
+    setMessage("");
+    setSelectedFile(null);
     setLoading(true);
-    
+
     try {
-      if (selectedProvider === 'llama') {
-        const response = await fetch('http://localhost:8000/llama/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: message.trim(),
-            temperature: 0.7,
-          }),
-        });
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/${currentProvider}/generate`, {
+        method: "POST",
+        body: formData,
+      });
 
-        if (!response.ok) {
-          throw new Error('Failed to generate response');
-        }
-
-        const data = await response.json();
-        
-        addMessage(activeChat, {
-          content: data.text,
-          role: 'assistant',
-        });
-      } else if (selectedProvider === 'gpt4.1') {
-        const response = await fetch('http://localhost:8000/gpt/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: message.trim(),
-            temperature: 0.5,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to generate response');
-        }
-
-        const data = await response.json();
-        
-        addMessage(activeChat, {
-          content: data.text,
-          role: 'assistant',
-        });
-      } else if (selectedProvider === 'claude') {
-        const response = await fetch('http://localhost:8000/claude/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: message.trim(),
-            history: currentChat?.messages.map(msg => ({
-              role: msg.role,
-              content: msg.content
-            })) || [],
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to generate response');
-        }
-
-        const data = await response.json();
-        
-        addMessage(activeChat, {
-          content: data.text,
-          role: 'assistant',
-        });
-      } else {
-        // Simulated response for other providers
-        setTimeout(() => {
-          const responses = [
-            "I understand your question. Let me help you with that...",
-            "That's an interesting point! Here's what I think...",
-            "Great question! Based on my knowledge, I can tell you that...",
-            "I'd be happy to help with that. Let me break it down for you...",
-            "Thanks for asking! Here's a comprehensive answer...",
-          ];
-          
-          const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-          
-          addMessage(activeChat, {
-            content: randomResponse + "\n\n(This is a simulated response. In the full implementation, this would connect to your chosen AI provider.)",
-            role: 'assistant',
-          });
-        }, 1500 + Math.random() * 1000);
+      if (!response.ok) {
+        throw new Error("Failed to send message");
       }
-    } catch (error) {
-      console.error('Error:', error);
+
+      const data = await response.json();
       addMessage(activeChat, {
+        role: "assistant",
+        content: data.text,
+      });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      addMessage(activeChat, {
+        role: "assistant",
         content: "Sorry, I encountered an error while processing your request. Please try again.",
-        role: 'assistant',
       });
     } finally {
       setLoading(false);
@@ -189,22 +147,9 @@ export const ChatInput: React.FC = () => {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    
-    files.forEach(file => {
-      const attachment: Attachment = {
-        id: Date.now().toString() + Math.random(),
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        url: URL.createObjectURL(file),
-      };
-      
-      setAttachments(prev => [...prev, attachment]);
-    });
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
     }
   };
 
@@ -228,104 +173,83 @@ export const ChatInput: React.FC = () => {
   );
 
   return (
-    <div className="border-t border-border bg-card/50 backdrop-blur-xl">
-      {/* Commands Dropdown */}
-      {showCommands && filteredCommands.length > 0 && (
-        <div className="p-2 border-b border-border">
-          <div className="bg-background/80 rounded-xl border border-border shadow-lg">
-            {filteredCommands.map((command) => (
-              <button
-                key={command.name}
-                onClick={() => handleCommandSelect(command.name)}
-                className="w-full p-3 text-left hover:bg-muted/50 first:rounded-t-xl last:rounded-b-xl transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <Command className="w-4 h-4 text-primary" />
-                  <div>
-                    <div className="font-medium text-sm">{command.name}</div>
-                    <div className="text-xs text-muted-foreground">{command.description}</div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Attachments Preview */}
-      {attachments.length > 0 && (
-        <div className="p-4 border-b border-border">
-          <div className="flex flex-wrap gap-2">
-            {attachments.map((attachment) => (
-              <div key={attachment.id} className="flex items-center space-x-2 bg-background/50 rounded-lg p-2 pr-1 border border-border">
-                {getFileIcon(attachment.type)}
-                <span className="text-sm truncate max-w-32">{attachment.name}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeAttachment(attachment.id)}
-                  className="p-1 h-auto text-muted-foreground hover:text-destructive"
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Input Area */}
-      <form onSubmit={handleSubmit} className="p-4">
-        <div className="flex items-end space-x-3 bg-background/50 rounded-2xl border border-border p-3 shadow-lg">
+    <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-white/10">
+      <form onSubmit={handleSubmit} className="container max-w-4xl mx-auto p-4">
+        <div className="relative flex items-center">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
           <Button
             type="button"
             variant="ghost"
-            size="sm"
-            onClick={() => {
-              fileInputRef.current?.click();
-            }}
-            className="flex-shrink-0 p-2 hover:bg-muted/50 rounded-xl"
+            size="icon"
+            className="absolute left-2 text-white/70 hover:text-white hover:bg-white/10"
+            onClick={() => fileInputRef.current?.click()}
           >
-            <Paperclip className="w-4 h-4" />
+            <Paperclip className="h-5 w-5" />
           </Button>
+          
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault()
+                handleSubmit(e)
+              }
+            }}
+            placeholder={`Message ${providers.find(p => p.value === selectedProvider)?.label || "AI"}...`}
+            className="w-full bg-white/5 text-white rounded-lg pl-12 pr-20 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none overflow-hidden"
+            style={{ height: "auto", minHeight: "48px", maxHeight: "200px" }}
+            rows={1}
+          />
+          
+          {selectedFile && (
+            <div className="absolute left-12 bottom-full mb-2 bg-white/10 text-white/70 px-2 py-1 rounded text-sm flex items-center">
+              <span className="truncate max-w-[200px]">{selectedFile.name}</span>
+              <button
+                type="button"
+                className="ml-2 text-white/50 hover:text-white"
+                onClick={() => setSelectedFile(null)}
+              >
+                ×
+              </button>
+            </div>
+          )}
 
-          <div className="flex-1 relative">
-            <Textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => {
-                setMessage(e.target.value);
-              }}
-              onKeyDown={handleKeyDown}
-              onFocus={handleInputFocus}
-              onClick={handleInputFocus}
-              placeholder="Ask anything..."
-              className="min-h-[44px] max-h-32 resize-none bg-transparent border-0 focus:ring-0 focus:border-0 text-sm placeholder:text-muted-foreground/70"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2">
+          <div className="absolute right-2 flex items-center space-x-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="h-9 px-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  className="h-9 px-3 text-xs font-medium text-white/50 hover:text-white hover:bg-white/5 transition-colors"
                 >
                   <span>{selectedProviderInfo?.label}</span>
                   <ChevronDown className="w-3 h-3 ml-1.5 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuContent align="end" className="w-64 bg-[#222222] border-white/10">
                 {providers.map((provider) => (
                   <DropdownMenuItem
                     key={provider.value}
                     onClick={() => setProvider(provider.value)}
-                    className={`cursor-pointer ${selectedProvider === provider.value ? 'bg-primary/10' : ''}`}
+                    className={`cursor-pointer ${
+                      selectedProvider === provider.value 
+                        ? 'bg-white/10 text-white' 
+                        : 'text-white/70 hover:bg-white/5'
+                    }`}
                   >
                     <div className="flex flex-col">
                       <span className="font-medium text-sm">{provider.label}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className={`text-xs ${
+                        selectedProvider === provider.value 
+                          ? 'text-white/70' 
+                          : 'text-white/50 group-hover:text-white/70'
+                      }`}>
                         {provider.description}
                       </span>
                     </div>
@@ -333,32 +257,16 @@ export const ChatInput: React.FC = () => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
             <Button 
               type="submit" 
-              disabled={!message.trim() || isLoading}
-              className="flex-shrink-0 h-9 w-9 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+              disabled={isLoading || (!message.trim() && !selectedFile)} 
+              className="bg-white/10 text-white hover:bg-white/20"
             >
-              <Send className="w-4 h-4" />
+              Send
             </Button>
           </div>
         </div>
-
-        <div className="mt-2 text-xs text-muted-foreground px-3">
-          Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Enter</kbd> to send, 
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono ml-1">Shift+Enter</kbd> for new line,
-          type <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono ml-1">/</kbd> for commands
-        </div>
       </form>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        accept="image/*,.pdf,.doc,.docx,.txt"
-        onChange={handleFileSelect}
-      />
     </div>
   );
 };

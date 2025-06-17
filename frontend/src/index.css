@@ -1,48 +1,41 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Pulse Chat inspired Design System */
+/* High Contrast Black & White Theme */
 
 @layer base {
   :root {
-    /* Pulse Chat inspired dark theme colors */
-    --background: 225 6% 8%;
-    --foreground: 210 40% 98%;
+    /* Base colors */
+    --background: 0 0% 10%;
+    --foreground: 0 0% 95%;
 
-    --card: 225 9% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 15%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 225 9% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 262 83% 58%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 0% 90%;
+    --primary-foreground: 0 0% 10%;
 
-    --secondary: 225 9% 16%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 225 9% 16%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 80%;
 
-    --accent: 262 83% 58%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 0 0% 90%;
+    --accent-foreground: 0 0% 10%;
 
     --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 95%;
 
-    --border: 225 9% 16%;
-    --input: 225 9% 16%;
-    --ring: 262 83% 58%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 80%;
 
     --radius: 0.75rem;
-
-    /* Chat specific colors */
-    --chat-user-bg: 262 83% 58%;
-    --chat-ai-bg: 225 9% 16%;
-    --chat-border: 225 9% 20%;
-    --chat-hover: 225 9% 20%;
   }
 }
 
@@ -57,59 +50,70 @@
     margin: 0;
     padding: 0;
   }
-
-  /* Reset default margins and padding for text elements */
-  h1, h2, h3, h4, h5, h6, p {
-    margin: 0;
-    padding: 0;
-  }
 }
 
 @layer components {
-  .glass-effect {
-    @apply backdrop-blur-xl bg-opacity-80 border border-white/10;
-  }
-  
   .message-user {
-    @apply bg-primary text-primary-foreground ml-12 rounded-2xl rounded-br-md shadow-lg shadow-primary/20;
+    @apply bg-white text-black ml-12 rounded-2xl rounded-br-md shadow-lg border border-white/20;
   }
   
   .message-ai {
-    @apply bg-muted text-foreground mr-12 rounded-2xl rounded-bl-md shadow-lg;
+    @apply bg-[#1a1a1a] text-[#e0e0e0] mr-12 rounded-2xl rounded-bl-md shadow-lg border border-white/10;
   }
   
   .chat-item-hover {
-    @apply transition-all duration-200 hover:bg-muted/50 hover:shadow-md;
+    @apply transition-all duration-200 hover:bg-white/5;
   }
   
   .message-animate {
     @apply animate-[fadeInUp_0.3s_ease-out];
   }
 
-  /* Remove default prose padding/margins */
+  /* Improved prose styles for better readability */
   .prose {
+    @apply text-base leading-relaxed;
     margin: 0;
   }
 
   .prose p {
-    margin: 0;
+    @apply mb-2 last:mb-0;
+  }
+
+  .prose pre {
+    @apply bg-[#2a2a2a] border border-white/10 rounded-xl p-4 my-2 text-[#e0e0e0];
+  }
+
+  .prose code {
+    @apply bg-[#2a2a2a] px-1.5 py-0.5 rounded text-sm font-mono text-[#e0e0e0];
   }
 
   .prose * {
-    margin-top: 0;
-    margin-bottom: 0;
+    @apply text-current;
   }
-}
 
-/* Custom animations */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+  .prose a {
+    @apply text-[#e0e0e0] hover:text-white underline-offset-4;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  /* Syntax highlighting for code blocks */
+  .prose .hljs-keyword,
+  .prose .hljs-function,
+  .prose .hljs-class {
+    @apply text-[#e0e0e0] font-semibold;
+  }
+
+  .prose .hljs-string,
+  .prose .hljs-regexp {
+    @apply text-[#a8e6cf];
+  }
+
+  .prose .hljs-number,
+  .prose .hljs-boolean {
+    @apply text-[#ffd3b6];
+  }
+
+  .prose .hljs-comment {
+    @apply text-[#808080];
   }
 }
 
@@ -119,14 +123,14 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
+  @apply bg-black/30;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground));
+  @apply bg-white/30 hover:bg-white/50 transition-colors;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary));
+  @apply bg-white/70;
 }

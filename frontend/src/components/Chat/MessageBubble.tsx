@@ -1,6 +1,6 @@
 import React from 'react';
 import { User, Bot, Copy, Check, FileText, ExternalLink } from 'lucide-react';
-import { Message } from '../../store/chatStore';
+import { Message, Attachment } from '../../store/chatStore';
 import { Button } from '../ui/button';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -11,9 +11,16 @@ interface MessageBubbleProps {
   message: Message;
 }
 
+interface AttachmentPreview {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+}
+
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const [copied, setCopied] = useState(false);
-  const [previewAttachment, setPreviewAttachment] = useState<any>(null);
+  const [previewAttachment, setPreviewAttachment] = useState<AttachmentPreview | null>(null);
   const [showTimestamp, setShowTimestamp] = useState(false);
   const [showAttachments, setShowAttachments] = useState(false);
   const isUser = message.role === 'user';
@@ -35,7 +42,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     }).format(date);
   };
 
-  const openAttachmentPreview = (attachment: any) => {
+  const openAttachmentPreview = (attachment: Attachment) => {
     if (attachment.type.startsWith('image/')) {
       setPreviewAttachment(attachment);
     } else {
@@ -43,7 +50,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     }
   };
 
-  const renderAttachmentThumbnail = (attachment: any) => {
+  const renderAttachmentThumbnail = (attachment: Attachment) => {
     if (attachment.type.startsWith('image/')) {
       return (
         <div className="relative group cursor-pointer" onClick={() => openAttachmentPreview(attachment)}>
@@ -92,25 +99,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start space-x-3 max-w-4xl group`}>
           {/* Profile Avatar */}
           <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
-            isUser ? 'bg-primary text-primary-foreground ml-3' : 'bg-muted text-muted-foreground mr-3'
+            isUser ? 'bg-white text-black ml-3 ring-2 ring-white/20' : 'bg-[#2a2a2a] text-[#e0e0e0] mr-3 ring-2 ring-white/10'
           }`}>
             {getUserInitials()}
           </div>
 
           {/* Message Content */}
-          <div 
-            className={`relative ${isUser ? 'message-user' : 'message-ai'} px-3 py-2 max-w-[80%] transition-all duration-200 hover:shadow-xl`}
+          <div
+            className={`relative ${isUser ? 'message-user' : 'message-ai'} px-4 py-3 max-w-[85%] transition-all duration-200`}
           >
             {/* Text Content */}
-            <div className="prose prose-sm dark:prose-invert max-w-none">
+            <div className={`prose prose-sm max-w-none ${isUser ? '' : 'text-[#e0e0e0]'}`}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {message.content}
               </ReactMarkdown>
             </div>
             {/* Attachments */}
             {message.attachments && message.attachments.length > 0 && (
-              <div className={`${message.content ? 'mt-2' : ''} space-y-2`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className={`${message.content ? 'mt-3' : ''} space-y-2`}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {message.attachments.map((attachment) => (
                     <div key={attachment.id}>
                       {renderAttachmentThumbnail(attachment)}
@@ -120,12 +127,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               </div>
             )}
             {/* Message Actions (copy) - top right, only on hover */}
-            <div className="mt-2 flex items-center space-x-2">
+            <div className="absolute top-2 right-2 flex items-center space-x-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleCopy}
-                className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                className={`h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity ${
+                  isUser ? 'hover:bg-black/10 text-black/70' : 'hover:bg-white/5 text-[#e0e0e0]'
+                }`}
               >
                 {copied ? (
                   <Check className="w-3 h-3" />
@@ -138,7 +147,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         </div>
       </div>
       {/* Timestamp below bubble, aligned to sender */}
-      <div className={`mb-4 text-xs text-muted-foreground ${isUser ? 'text-right mr-12' : 'text-left pl-16'}`}>
+      <div className={`mb-4 text-xs text-white/40 ${isUser ? 'text-right mr-12' : 'text-left pl-16'}`}>
         {formatTime(message.timestamp)}
       </div>
 
