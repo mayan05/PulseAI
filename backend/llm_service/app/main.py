@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import gpt, Llama
+from .routes import gpt, Llama, claude
 from pydantic import BaseModel
+import uvicorn
 
 SYSTEM_MESSAGE = "Make sure you are kind, welcoming, accurate and precise in responding towards the prompts of the user. Make sure you reply ASAP and dont keep the user waiting for your response for too long"
 
@@ -24,7 +25,7 @@ app.add_middleware(
 # Include routers
 app.include_router(gpt.router)
 app.include_router(Llama.llamaRouter)
+app.include_router(claude.claudeRouter)
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("app.main:app", host="localhost", port=8000, reload=True) 
