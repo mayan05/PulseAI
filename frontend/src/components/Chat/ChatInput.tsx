@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, Image, FileText, Command, ChevronDown } from 'lucide-react';
+import { Send, Paperclip, X, Image, FileText, Command, ChevronDown, Check } from 'lucide-react';
 import { useChatStore, Attachment, LLMProvider } from '../../store/chatStore';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
@@ -13,7 +13,7 @@ import {
 const providers: { value: LLMProvider; label: string; description: string }[] = [
   { 
     value: 'claude', 
-    label: 'Claude Sonnet', 
+    label: 'Claude Sonnet 4', 
     description: 'Best for detailed explanations & coding help'
   },
   { 
@@ -23,7 +23,7 @@ const providers: { value: LLMProvider; label: string; description: string }[] = 
   },
   { 
     value: 'llama', 
-    label: 'Llama 2', 
+    label: 'Llama 3.3', 
     description: 'Quick responses • Efficient for simple tasks'
   },
 ];
@@ -39,6 +39,7 @@ export const ChatInput: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileUploadError, setFileUploadError] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [hoveredProvider, setHoveredProvider] = useState<LLMProvider | null>(null);
 
   const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
   const currentChat = chats.find(chat => chat.id === activeChat);
@@ -296,74 +297,98 @@ export const ChatInput: React.FC = () => {
             </div>
           </div>
         )}
-        <div className="relative flex items-center">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            className="hidden"
-            disabled={selectedProvider === 'llama'}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={`absolute left-2 text-white/70 hover:text-white hover:bg-white/10 ${
-              selectedProvider === 'llama' ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            onClick={() => {
-              if (selectedProvider === 'llama') {
-                setFileUploadError('File upload is only supported for GPT-4 and Claude.');
-                return;
-              }
-              setFileUploadError(null);
-              fileInputRef.current?.click();
-            }}
-            disabled={selectedProvider === 'llama'}
-          >
-            <Paperclip className="h-5 w-5" />
-          </Button>
-          
-          {/* Show error if file upload is not allowed */}
-          {fileUploadError && (
-            <div className="absolute left-12 bottom-full mb-2 bg-red-600 text-white px-2 py-1 rounded text-sm flex items-center z-10">
-              <span>{fileUploadError}</span>
-              <button
-                type="button"
-                className="ml-2 text-white/80 hover:text-white"
-                onClick={() => setFileUploadError(null)}
-              >
-                ×
-              </button>
-            </div>
-          )}
-          
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (showCommands && filteredCommands.length > 0) {
-                if (e.key === 'ArrowDown' || e.key === 'Tab') {
-                  e.preventDefault();
-                  // Move selection down (not implemented in this snippet, but can be added for full UX)
-                } else if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleCommandSelect(filteredCommands[0].name);
+        {/* Input and controls split into two flex items */}
+        <div className="flex flex-row w-full gap-2">
+          {/* Left: Input area */}
+          <div className="flex-1 relative flex flex-col justify-end">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              disabled={selectedProvider === 'llama'}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={`absolute left-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-white/10 ${
+                selectedProvider === 'llama' ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              onClick={() => {
+                if (selectedProvider === 'llama') {
+                  setFileUploadError('File upload is only supported for GPT-4 and Claude.');
                   return;
                 }
-              }
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
-            placeholder={`Message ${providers.find(p => p.value === selectedProvider)?.label || "AI"}...`}
-            className="w-full bg-white/5 text-white rounded-lg pl-12 pr-20 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none overflow-hidden"
-            style={{ height: "auto", minHeight: "48px", maxHeight: "200px" }}
-            rows={1}
-          />
-          
-          <div className="absolute right-2 flex items-center space-x-2">
+                setFileUploadError(null);
+                fileInputRef.current?.click();
+              }}
+              disabled={selectedProvider === 'llama'}
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
+            {/* Show error if file upload is not allowed */}
+            {fileUploadError && (
+              <div className="absolute left-12 bottom-full mb-2 bg-red-600 text-white px-2 py-1 rounded text-sm flex items-center z-10">
+                <span>{fileUploadError}</span>
+                <button
+                  type="button"
+                  className="ml-2 text-white/80 hover:text-white"
+                  onClick={() => setFileUploadError(null)}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                if (textareaRef.current) {
+                  textareaRef.current.style.height = 'auto';
+                  textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 300)}px`;
+                }
+              }}
+              onKeyDown={(e) => {
+                if (showCommands && filteredCommands.length > 0) {
+                  if (e.key === 'ArrowDown' || e.key === 'Tab') {
+                    e.preventDefault();
+                    // Move selection down (not implemented in this snippet, but can be added for full UX)
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCommandSelect(filteredCommands[0].name);
+                    return;
+                  }
+                }
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
+              placeholder={`Message ${providers.find(p => p.value === selectedProvider)?.label || "AI"}...`}
+              className="w-full bg-white/5 text-white rounded-lg pl-12 pr-2 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none overflow-hidden leading-relaxed break-words break-all"
+              style={{ minHeight: "48px", maxHeight: "300px", height: "auto", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap" }}
+              rows={1}
+            />
+            {/* Command dropdown, positioned relative to the input area */}
+            {showCommands && filteredCommands.length > 0 && (
+              <div className="absolute left-0 right-0 bottom-full mb-2 w-full max-w-full bg-[#232323] border border-white/10 rounded-lg shadow-lg z-30">
+                {filteredCommands.map((cmd, idx) => (
+                  <div
+                    key={cmd.name}
+                    className={`px-4 py-2 cursor-pointer text-white/90 hover:bg-white/10 ${idx === 0 ? 'rounded-t-lg' : ''} ${idx === filteredCommands.length - 1 ? 'rounded-b-lg' : ''}`}
+                    onMouseDown={() => handleCommandSelect(cmd.name)}
+                  >
+                    <span className="font-mono text-sm">{cmd.name}</span>
+                    <span className="ml-2 text-xs text-white/50">{cmd.description}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Right: Controls */}
+          <div className="flex flex-row items-center gap-2 min-w-[120px] ml-2 pb-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
@@ -372,32 +397,33 @@ export const ChatInput: React.FC = () => {
                   className="h-9 px-3 text-xs font-medium text-white/50 hover:text-white hover:bg-white/5 transition-colors"
                 >
                   <span>{selectedProviderInfo?.label}</span>
-                  <ChevronDown className="w-3 h-3 ml-1.5 opacity-50" />
+                  <ChevronDown className="w-3 h-3 ml-1.5 opacity-50 transform rotate-180" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 bg-[#222222] border-white/10">
-                {providers.map((provider) => (
-                  <DropdownMenuItem
-                    key={provider.value}
-                    onClick={() => setProvider(provider.value)}
-                    className={`cursor-pointer ${
-                      selectedProvider === provider.value 
-                        ? 'bg-white/10 text-white' 
-                        : 'text-white/70 hover:bg-white/5'
-                    }`}
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium text-sm">{provider.label}</span>
-                      <span className={`text-xs ${
-                        selectedProvider === provider.value 
-                          ? 'text-white/70' 
-                          : 'text-white/50 group-hover:text-white/70'
-                      }`}>
-                        {provider.description}
-                      </span>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
+                {providers.map((provider) => {
+                  const isSelected = selectedProvider === provider.value;
+                  const isHovered = hoveredProvider === provider.value;
+                  return (
+                    <DropdownMenuItem
+                      key={provider.value}
+                      onClick={() => setProvider(provider.value)}
+                      onMouseEnter={() => setHoveredProvider(provider.value)}
+                      onMouseLeave={() => setHoveredProvider(null)}
+                      className={`cursor-pointer flex items-center justify-between transition-colors
+                        ${isSelected ? 'bg-white/10 text-white' : isHovered ? 'bg-white/5 text-white' : 'text-white/70 hover:bg-white/5'}
+                      `}
+                    >
+                      <div className="flex flex-col flex-1">
+                        <span className="font-medium text-sm">{provider.label}</span>
+                        <span className="text-xs" style={{ color: isHovered ? 'black' : undefined }}>{provider.description}</span>
+                      </div>
+                      {isSelected && (
+                        <Check className="w-4 h-4 ml-2 text-green-400" />
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })}
               </DropdownMenuContent>
             </DropdownMenu>
             <Button 
@@ -408,21 +434,6 @@ export const ChatInput: React.FC = () => {
               Send
             </Button>
           </div>
-          {/* Command dropdown, positioned relative to the input bar */}
-          {showCommands && filteredCommands.length > 0 && (
-            <div className="absolute left-0 right-0 bottom-full mb-2 w-full max-w-full bg-[#232323] border border-white/10 rounded-lg shadow-lg z-30">
-              {filteredCommands.map((cmd, idx) => (
-                <div
-                  key={cmd.name}
-                  className={`px-4 py-2 cursor-pointer text-white/90 hover:bg-white/10 ${idx === 0 ? 'rounded-t-lg' : ''} ${idx === filteredCommands.length - 1 ? 'rounded-b-lg' : ''}`}
-                  onMouseDown={() => handleCommandSelect(cmd.name)}
-                >
-                  <span className="font-mono text-sm">{cmd.name}</span>
-                  <span className="ml-2 text-xs text-white/50">{cmd.description}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </form>
       <div className="text-xs text-white/40 px-6 pb-3 select-none">
