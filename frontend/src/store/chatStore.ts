@@ -32,6 +32,7 @@ interface ChatState {
   isAuthenticated: boolean;
   selectedProvider: LLMProvider;
   isLoading: boolean;
+  isGeneratingImage: boolean;
 }
 
 interface ChatActions {
@@ -42,6 +43,8 @@ interface ChatActions {
   setAuthenticated: (authenticated: boolean) => void;
   setProvider: (provider: LLMProvider) => void;
   setLoading: (loading: boolean) => void;
+  setGeneratingImage: (generating: boolean) => void;
+  updateChat: (chatId: string, updatedChat: Chat) => void;
 }
 
 type ChatStore = ChatState & ChatActions;
@@ -60,6 +63,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isAuthenticated: false,
   selectedProvider: 'llama',
   isLoading: false,
+  isGeneratingImage: false,
 
   createChat: () => {
     const newChat = createDefaultChat();
@@ -135,5 +139,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   setLoading: (loading: boolean) => {
     set({ isLoading: loading });
+  },
+
+  setGeneratingImage: (generating: boolean) => {
+    set({ isGeneratingImage: generating });
+  },
+
+  updateChat: (chatId: string, updatedChat: Chat) => {
+    set((state) => ({
+      chats: state.chats.map((chat) =>
+        chat.id === chatId ? updatedChat : chat
+      ),
+    }));
   },
 }));

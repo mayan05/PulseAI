@@ -38,12 +38,13 @@ export const ChatInput: React.FC = () => {
   const [hasInteracted, setHasInteracted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileUploadError, setFileUploadError] = useState<string | null>(null);
+  const [generatingImage, setGeneratingImage] = useState(false);
 
   const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
   const currentChat = chats.find(chat => chat.id === activeChat);
 
   const commands = [
-    { name: '/imagine', description: 'Generate an image' },
+    { name: '/image', description: 'Generate an image' },
     { name: '/reset', description: 'Clear conversation' },
     { name: '/summarize', description: 'Summarize conversation' },
     { name: '/explain', description: 'Explain in detail' },
@@ -88,6 +89,73 @@ export const ChatInput: React.FC = () => {
     e.preventDefault();
     if (!message.trim() && !selectedFile || !activeChat) return;
 
+    // Check if this is an image generation request
+    if (message.startsWith('/image')) {
+      const prompt = message.slice('/image'.length).trim();
+      if (!prompt) {
+        addMessage(activeChat, {
+          role: "assistant",
+          content: "Please provide a description for the image you want to generate.",
+        });
+        return;
+      }
+
+      // Add the user's message to the chat
+      addMessage(activeChat, {
+        role: "user",
+        content: message,
+      });
+
+      setMessage("");
+      setLoading(true);
+      setGeneratingImage(true);
+
+      try {
+        const response = await fetch('http://localhost:8000/gpt/generate-image', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt,
+            size: "1024x1024",
+            quality: "standard",
+            style: "natural",
+            n: 1
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate image');
+        }
+
+        const data = await response.json();
+        
+        // Add the generated image to the chat
+        addMessage(activeChat, {
+          role: "assistant",
+          content: "Here's your generated image:",
+          attachments: [{
+            id: Date.now().toString(),
+            name: "generated-image.png",
+            type: "image/png",
+            url: data.image_url,
+            size: 0 // Size will be determined when the image is loaded
+          }]
+        });
+      } catch (error) {
+        addMessage(activeChat, {
+          role: "assistant",
+          content: "Sorry, I encountered an error while generating the image. Please try again.",
+        });
+      } finally {
+        setLoading(false);
+        setGeneratingImage(false);
+      }
+      return;
+    }
+
+    // Handle regular chat messages
     // Prepare attachments array if a file is selected
     const attachments = [];
     if (selectedFile) {

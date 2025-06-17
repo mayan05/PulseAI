@@ -7,8 +7,8 @@ export const ChatMessages: React.FC = () => {
   const { chats, activeChat, isLoading } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  
-  const currentChat = chats.find(chat => chat.id === activeChat);
+
+  const currentChat = chats.find((chat) => chat.id === activeChat);
   const messages = currentChat?.messages || [];
 
   const scrollToBottom = () => {
@@ -32,10 +32,10 @@ export const ChatMessages: React.FC = () => {
             <span className="text-3xl">💬</span>
           </div>
           <h3 className="text-xl font-bold mb-2 text-white">
-            Start a conversation
+            No chat selected
           </h3>
-          <p className="text-white/70 leading-relaxed">
-            Choose a chat from the sidebar or create a new one to get started with T3 Chat.
+          <p className="text-white/70">
+            Select a chat from the sidebar or create a new one to start messaging.
           </p>
         </div>
       </div>
@@ -88,9 +88,9 @@ export const ChatMessages: React.FC = () => {
               <LoadingMessage />
             </div>
           )}
+          <div ref={messagesEndRef} />
         </>
       )}
-      <div ref={messagesEndRef} className="h-4" />
     </div>
   );
 };

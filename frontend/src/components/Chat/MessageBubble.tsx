@@ -102,21 +102,43 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     }
   };
 
+  const handleImageDownload = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      alert('Failed to download image.');
+    }
+  };
+
   const renderAttachmentThumbnail = (attachment: Attachment) => {
     if (attachment.type.startsWith('image/')) {
       return (
-        <div className="relative group cursor-pointer" onClick={() => openAttachmentPreview(attachment)}>
+        <div className="relative group w-full">
           <img
             src={attachment.url}
             alt={attachment.name}
-            className="w-32 h-32 object-cover rounded-xl border border-border hover:opacity-90 transition-opacity shadow-md"
+            className="w-full h-auto rounded-xl border-2 border-white/10 shadow-lg object-contain bg-black"
+            style={{ maxHeight: '420px', display: 'block' }}
           />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition-colors flex items-center justify-center">
-            <ExternalLink className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="mt-2 text-xs text-muted-foreground truncate max-w-32">
-            {attachment.name}
-          </div>
+          <a
+            href={attachment.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute bottom-3 right-3 p-2 rounded-full bg-black/70 text-white hover:bg-blue-600 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 sm:opacity-100 z-10 shadow-lg"
+            title="Open image in new tab"
+            onClick={e => e.stopPropagation()}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" /></svg>
+          </a>
         </div>
       );
     } else {
@@ -157,7 +179,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
           {/* Message Content */}
           <div
-            className={`relative ${isUser ? 'message-user' : 'message-ai'} px-4 py-3 max-w-[85%] transition-all duration-200`}
+            className={`relative ${isUser ? 'message-user' : 'message-ai'} ${message.attachments && message.attachments.length > 0 && !message.content ? 'p-0' : 'px-4'} py-3 max-w-[85%] transition-all duration-200`}
           >
             {/* Text Content */}
             <div className={`prose prose-sm max-w-none ${isUser ? '' : 'text-[#e0e0e0]'}`}>
@@ -189,24 +211,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       <div className={`mb-4 text-xs text-white/40 ${isUser ? 'text-right mr-12' : 'text-left pl-16'}`}>
         {formatTime(message.timestamp)}
       </div>
-
-      {/* Image Preview Modal */}
-      <Dialog open={!!previewAttachment} onOpenChange={() => setPreviewAttachment(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-card border-border">
-          <DialogHeader>
-            <DialogTitle>{previewAttachment?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="flex items-center justify-center p-4">
-            {previewAttachment && (
-              <img
-                src={previewAttachment.url}
-                alt={previewAttachment.name}
-                className="max-w-full max-h-[70vh] object-contain rounded-lg"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {message.attachments && message.attachments.length > 0 && (
         <Dialog open={showAttachments} onOpenChange={setShowAttachments}>

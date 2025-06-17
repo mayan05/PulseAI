@@ -8,6 +8,7 @@ from datetime import datetime
 import PyPDF2
 import io
 from typing import Optional
+import base64
 
 # Load environment variables
 load_dotenv()
@@ -17,6 +18,13 @@ router = APIRouter(prefix="/gpt", tags=["gpt"])
 class GenerateRequest(BaseModel):
     prompt: str
     temperature: float = 0.7
+
+class ImageGenerateRequest(BaseModel):
+    prompt: str
+    size: str = "1024x1024"
+    quality: str = "standard"
+    style: str = "natural"
+    n: int = 1
 
 async def extract_file_content(file: UploadFile) -> str:
     content = await file.read()
@@ -82,4 +90,40 @@ async def generate_text(
         raise HTTPException(
             status_code=500,
             detail=f"Error generating response: {str(e)}"
+        )
+
+@router.post("/generate-image", response_class=JSONResponse)
+async def generate_image(data: ImageGenerateRequest):
+    try:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=500, 
+                detail="OPENAI_API_KEY not found in environment variables"
+            )
+            
+        client = OpenAI(api_key=api_key)
+        
+        # Call OpenAI API for image generation
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=data.prompt,
+            size=data.size,
+            quality=data.quality,
+            style=data.style,
+            n=data.n
+        )
+        
+        # Get the image URL from the response
+        image_url = response.data[0].url
+        
+        return JSONResponse(content={
+            "image_url": image_url,
+            "model": "dall-e-3",
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating image: {str(e)}"
         )
