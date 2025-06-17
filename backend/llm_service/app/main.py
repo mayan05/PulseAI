@@ -6,7 +6,7 @@ from routes.claude import claudeRouter
 from pydantic import BaseModel
 import uvicorn
 
-SYSTEM_MESSAGE = "Make sure you are kind, welcoming, accurate and precise in responding towards the prompts of the user. Make sure you reply ASAP and dont keep the user waiting for your response for too long"
+SYSTEM_MESSAGE = "Make sure you are kind, welcoming, accurate and precise in responding towards the prompts of the user. If asked about code, return beautiful code formatting"
 
 class GenerateRequest(BaseModel):
     prompt: str
