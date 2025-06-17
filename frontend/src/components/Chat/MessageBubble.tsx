@@ -49,7 +49,7 @@ const CodeBlock: React.FC<{ inline?: boolean; className?: string; children: Reac
           borderRadius: '0.75rem',
           padding: '1.5rem 1rem 1rem 1rem', // removed extra left padding for line numbers
           fontSize: '0.95em',
-          background: '#18181b',
+          background: 'none', // Remove background highlight
           margin: 0,
         }}
       >
