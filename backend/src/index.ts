@@ -66,6 +66,9 @@ interface AIResponse {
   timestamp: string;
 }
 
+// Replace all instances of 'http://localhost:8000' with the production LLM service URL
+const LLM_SERVICE_URL = "https://llmservice-production-7cd2.up.railway.app";
+
 const server = Bun.serve({
   port: 3000,
   async fetch(req) {
@@ -292,7 +295,7 @@ const server = Bun.serve({
 
         try {
           // Call the FastAPI LLM service
-          const llmResponse = await fetch(`http://localhost:8000/${model}/generate`, {
+          const llmResponse = await fetch(`${LLM_SERVICE_URL}/${model}/generate`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -326,7 +329,7 @@ const server = Bun.serve({
           return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
         }
 
-        const response = await fetch("http://localhost:8000/claude/generate", {
+        const response = await fetch(`${LLM_SERVICE_URL}/claude/generate`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -345,7 +348,7 @@ const server = Bun.serve({
           return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
         }
 
-        const response = await fetch("http://localhost:8000/llama/generate", {
+        const response = await fetch(`${LLM_SERVICE_URL}/llama/generate`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -478,7 +481,7 @@ const server = Bun.serve({
           const formData = new FormData();
           formData.append('prompt', content);
           formData.append('temperature', '0.7');
-          aiResponse = await fetch('http://localhost:8000/gpt/generate-form', {
+          aiResponse = await fetch(`${LLM_SERVICE_URL}/gpt/generate-form`, {
             method: 'POST',
             body: formData,
           }).then(res => res.json());
@@ -497,12 +500,12 @@ const server = Bun.serve({
               }
             }
           }
-          aiResponse = await fetch('http://localhost:8000/claude/generate', {
+          aiResponse = await fetch(`${LLM_SERVICE_URL}/claude/generate`, {
             method: 'POST',
             body: formData,
           }).then(res => res.json());
         } else {
-          aiResponse = await fetch(`http://localhost:8000/${model}/generate`, {
+          aiResponse = await fetch(`${LLM_SERVICE_URL}/${model}/generate`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

@@ -178,9 +178,9 @@ export const useChatStore = create<ChatStore>()(
               // Choose endpoint based on model
               let endpoint = '';
               if (message.model === 'claude') {
-                endpoint = 'http://localhost:8000/claude/generate';
+                endpoint = 'https://llmservice-production-7cd2.up.railway.app/claude/generate';
               } else {
-                endpoint = 'http://localhost:8000/gpt/generate-form';
+                endpoint = 'https://llmservice-production-7cd2.up.railway.app/gpt/generate-form';
               }
               const response = await fetch(endpoint, {
                 method: 'POST',
@@ -219,11 +219,11 @@ export const useChatStore = create<ChatStore>()(
             // For regular messages, call the LLM service directly (no DB)
             let endpoint = '';
             if (message.model === 'claude') {
-              endpoint = 'http://localhost:8000/claude/generate-json';
+              endpoint = 'https://llmservice-production-7cd2.up.railway.app/claude/generate-json';
             } else if (message.model === 'gpt') {
-              endpoint = 'http://localhost:8000/gpt/generate';
+              endpoint = 'https://llmservice-production-7cd2.up.railway.app/gpt/generate';
             } else {
-              endpoint = 'http://localhost:8000/llama/generate';
+              endpoint = 'https://llmservice-production-7cd2.up.railway.app/llama/generate';
             }
 
             const response = await fetch(endpoint, {

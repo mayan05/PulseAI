@@ -28,7 +28,7 @@ export default function Settings() {
   useEffect(() => {
     async function fetchMe() {
       if (!token) return;
-      const res = await fetch('http://localhost:3000/me', {
+      const res = await fetch('https://pulse-backend-1ocr.onrender.com/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -47,7 +47,7 @@ export default function Settings() {
     setError('');
     setSuccess('');
     try {
-      const res = await fetch('http://localhost:3000/me', {
+      const res = await fetch('https://pulse-backend-1ocr.onrender.com/me', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +77,7 @@ export default function Settings() {
       return;
     }
     try {
-      const res = await fetch('http://localhost:3000/me/password', {
+      const res = await fetch('https://pulse-backend-1ocr.onrender.com/me/password', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
