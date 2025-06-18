@@ -243,7 +243,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                   return (
                     <img
                       src={match[1]}
-                      alt="Generated Image"
+                      alt={message.content.slice(0, 20)}
                       style={{
                         maxWidth: '100%',
                         height: 'auto',
@@ -279,6 +279,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                   </div>
                 </div>
               )}
+              {imageUrl && (
+                <a
+                  href={imageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="inline-flex items-center gap-2 px-3 py-1.5 mt-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-medium transition shadow backdrop-blur-md"
+                  title="Download image"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </a>
+              )}
             </div>
           ) : (
             <div className="w-full max-w-[70%] text-left px-0 py-0">
@@ -292,7 +305,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                     return (
                       <img
                         src={match[1]}
-                        alt="Generated Image"
+                        alt={message.content.slice(0, 20)}
                         style={{
                           maxWidth: '100%',
                           height: 'auto',
@@ -328,6 +341,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                     ))}
                   </div>
                 </div>
+              )}
+              {imageUrl && (
+                <a
+                  href={imageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="inline-flex items-center gap-2 px-3 py-1.5 mt-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-medium transition shadow backdrop-blur-md"
+                  title="Download image"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </a>
               )}
             </div>
           )}

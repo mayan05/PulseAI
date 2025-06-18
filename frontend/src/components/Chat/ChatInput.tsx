@@ -218,9 +218,7 @@ export const ChatInput: React.FC = () => {
               if (data.image || data.image_url) {
                 const aiMessage: Message = {
                   id: `temp-${Date.now() + 1}`,
-                  content: data.image
-                    ? `![Generated Image](${data.image})`
-                    : `![Generated Image](${data.image_url})`,
+                  content: data.image ? `![](${data.image})` : `![](${data.image_url})`,
                   type: 'TEXT' as const,
                   model: selectedProvider,
                   role: 'ASSISTANT',
