@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { User, Bot, Copy, Check, FileText, ExternalLink, Download } from 'lucide-react';
 import { Message, Attachment } from '../../store/chatStore';
 import { Button } from '../ui/button';
-import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -14,11 +13,35 @@ interface MessageBubbleProps {
 }
 
 interface AttachmentPreview {
-  id: string;
+  url: string;
   name: string;
   type: string;
-  url: string;
 }
+
+// Simple text renderer for basic messages (no markdown)
+const SimpleTextRenderer: React.FC<{ content: string }> = ({ content }) => {
+  // Check if content contains markdown-like patterns
+  const hasMarkdown = /[*_`#\[\]()]/.test(content) || content.includes('```') || content.includes('![');
+  
+  if (!hasMarkdown) {
+    // Simple text rendering for better performance
+    return (
+      <div className="whitespace-pre-wrap break-words">
+        {content}
+      </div>
+    );
+  }
+  
+  // Use ReactMarkdown for complex content
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{ code: CodeBlock }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+};
 
 // Custom CodeBlock component with copy button
 const CodeBlock: React.FC<{ inline?: boolean; className?: string; children: React.ReactNode }> = ({ inline, className, children, ...props }) => {
@@ -70,7 +93,7 @@ const CodeBlock: React.FC<{ inline?: boolean; className?: string; children: Reac
   );
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message }) => {
   const [copied, setCopied] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<AttachmentPreview | null>(null);
   const [showTimestamp, setShowTimestamp] = useState(false);
@@ -211,12 +234,30 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               className={`bg-white text-black rounded-2xl px-4 py-2 max-w-[70%] shadow-md break-words whitespace-pre-line`}
               style={{ wordBreak: 'break-word', marginRight: 0 }}
             >
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{ code: CodeBlock }}
-              >
-                {message.content}
-              </ReactMarkdown>
+              <SimpleTextRenderer content={message.content} />
+              {/* Fallback: Directly render image if markdown fails or is stripped */}
+              {(() => {
+                // Try to extract a data:image or http(s) image URL from the message content
+                const match = message.content.match(/(data:image\/[^)\s]+|https?:\/\/[^)\s]+\.(png|jpg|jpeg|gif|webp|svg))/i);
+                if (match && match[1]) {
+                  return (
+                    <img
+                      src={match[1]}
+                      alt="Generated Image"
+                      style={{
+                        maxWidth: '100%',
+                        height: 'auto',
+                        display: 'block',
+                        margin: '1rem auto',
+                        background: '#222',
+                        borderRadius: '0.75rem',
+                        boxShadow: '0 2px 16px #0004',
+                      }}
+                    />
+                  );
+                }
+                return null;
+              })()}
               {/* Image style override for .prose */}
               <style>{`
                 .prose img {
@@ -242,12 +283,30 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           ) : (
             <div className="w-full max-w-[70%] text-left px-0 py-0">
               <div className={`prose prose-sm max-w-none text-[#e0e0e0] bg-transparent p-0 m-0`} style={{ margin: 0 }}>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{ code: CodeBlock }}
-                >
-                  {message.content}
-                </ReactMarkdown>
+                <SimpleTextRenderer content={message.content} />
+                {/* Fallback: Directly render image if markdown fails or is stripped */}
+                {(() => {
+                  // Try to extract a data:image or http(s) image URL from the message content
+                  const match = message.content.match(/(data:image\/[^)\s]+|https?:\/\/[^)\s]+\.(png|jpg|jpeg|gif|webp|svg))/i);
+                  if (match && match[1]) {
+                    return (
+                      <img
+                        src={match[1]}
+                        alt="Generated Image"
+                        style={{
+                          maxWidth: '100%',
+                          height: 'auto',
+                          display: 'block',
+                          margin: '1rem auto',
+                          background: '#222',
+                          borderRadius: '0.75rem',
+                          boxShadow: '0 2px 16px #0004',
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })()}
                 {/* Image style override for .prose */}
                 <style>{`
                   .prose img {
@@ -326,4 +385,4 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       )}
     </>
   );
-};
+});

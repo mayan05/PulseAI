@@ -59,8 +59,6 @@ interface ChatActions {
 
 type ChatStore = ChatState & ChatActions;
 
-const API_URL = 'http://localhost:3000';
-
 export const useChatStore = create<ChatStore>()(
   persist(
     (set, get) => ({
@@ -82,143 +80,38 @@ export const useChatStore = create<ChatStore>()(
               return;
             }
           }
-          // Fallback to DB fetch
-          console.log('Loading chats from DB...');
-          const isAuthenticated = useAuthStore.getState().isAuthenticated();
-          if (!isAuthenticated) {
-            console.log('Not authenticated, skipping chat load');
-            return;
-          }
-          const token = localStorage.getItem('token');
-          const response = await fetch(`${API_URL}/conversations`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          });
-          if (!response.ok) throw new Error('Failed to load chats');
-          const conversations = await response.json();
-          const chatsWithMessages = conversations.map((chat) => ({
-            ...chat,
-            messages: (chat.messages || []).map(msg => ({
-              ...msg,
-              attachments: (() => {
-                let atts = [];
-                if (typeof msg.attachments === 'string') {
-                  try {
-                    atts = JSON.parse(msg.attachments);
-                  } catch {
-                    atts = [];
-                  }
-                } else if (Array.isArray(msg.attachments)) {
-                  atts = msg.attachments;
-                }
-                // Only keep objects with a string type property
-                return Array.isArray(atts)
-                  ? atts.filter(att => att && typeof att === 'object' && typeof att.type === 'string')
-                  : [];
-              })(),
-            })),
-          }));
-          set({ chats: chatsWithMessages });
-          if (!get().activeChat && chatsWithMessages.length > 0) {
-            set({ activeChat: chatsWithMessages[0].id });
-          }
+          // Only use localStorage - no DB fallback to ensure persistence
+          console.log('No local chats found, starting fresh');
         } catch (error) {
           console.error('Error loading chats:', error);
         }
       },
 
       createChat: async (): Promise<Chat | null> => {
-        try {
-          const token = localStorage.getItem('token');
-          if (!token) {
-            throw new Error('Not authenticated');
-          }
+        // Create chat purely in localStorage - no DB calls
+        const newChat: Chat = {
+          id: `chat-${Date.now()}`,
+          title: 'New Chat',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          messages: [],
+        };
 
-          // Create optimistic chat immediately
-          const optimisticChat: Chat = {
-            id: `temp-${Date.now()}`,
-            title: 'New Chat',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            messages: [],
-          };
+        // Update UI immediately
+        set((state) => ({
+          chats: [newChat, ...state.chats],
+          activeChat: newChat.id,
+        }));
 
-          // Update UI immediately with optimistic chat
-          set((state) => ({
-            chats: [optimisticChat, ...state.chats],
-            activeChat: optimisticChat.id,
-          }));
-
-          const response = await fetch(`${API_URL}/conversations`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              title: 'New Chat',
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to create chat');
-          }
-
-          const newChat = await response.json();
-
-          // Replace optimistic chat with real chat
-          set((state) => ({
-            chats: state.chats.map((chat) =>
-              chat.id === optimisticChat.id ? newChat : chat
-            ),
-            activeChat: newChat.id,
-          }));
-
-          return newChat;
-        } catch (error) {
-          console.error('Error creating chat:', error);
-          // Remove optimistic chat on error
-          set((state) => ({
-            chats: state.chats.filter((chat) => !chat.id.startsWith('temp-')),
-            activeChat: null,
-          }));
-          return null;
-        }
+        return newChat;
       },
 
       deleteChat: async (chatId: string): Promise<void> => {
-        try {
-          const token = localStorage.getItem('token');
-          if (!token) {
-            throw new Error('Not authenticated');
-          }
-
-          // Optimistically remove the chat from UI
-          set((state) => ({
-            chats: state.chats.filter((chat) => chat.id !== chatId),
-            activeChat: state.activeChat === chatId ? null : state.activeChat,
-          }));
-
-          // Make the API call in the background
-          const response = await fetch(`${API_URL}/conversations/${chatId}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to delete chat');
-          }
-
-          // No need to update state again since we already removed it optimistically
-        } catch (error) {
-          console.error('Error deleting chat:', error);
-          // If there's an error, we could potentially restore the chat
-          // But for now, we'll just log the error since the deletion likely succeeded
-          // and the chat is already gone from the UI
-        }
+        // Remove chat from localStorage only - no DB calls
+        set((state) => ({
+          chats: state.chats.filter((chat) => chat.id !== chatId),
+          activeChat: state.activeChat === chatId ? null : state.activeChat,
+        }));
       },
 
       setActiveChat: (chatId: string) => {
@@ -226,165 +119,171 @@ export const useChatStore = create<ChatStore>()(
       },
 
       addMessage: async (chatId: string, message: Omit<Message, 'id' | 'createdAt' | 'conversationId' | 'timestamp'>): Promise<void> => {
-        // Create optimistic message at the start of the function
-        const optimisticMessage: Message = {
-          id: `temp-${Date.now()}`,
+        // Create user message immediately for instant UI update
+        const userMessage: Message = {
+          id: `user-${Date.now()}`,
           ...message,
           createdAt: new Date(),
           timestamp: new Date(),
           conversationId: chatId,
         };
 
-        try {
-          // Get auth token
-          const token = localStorage.getItem('token');
-          if (!token) {
-            throw new Error('Not authenticated');
-          }
+        // Create optimistic AI message for instant UI feedback
+        const optimisticAiMessage: Message = {
+          id: `temp-ai-${Date.now()}`,
+          content: '...',
+          type: 'TEXT' as const,
+          model: message.model,
+          role: 'ASSISTANT' as const,
+          createdAt: new Date(),
+          timestamp: new Date(),
+          conversationId: chatId,
+        };
 
-          // Update UI immediately with optimistic message
-          set((state) => ({
-            chats: state.chats.map((chat) =>
-              chat.id === chatId
-                ? {
-                    ...chat,
-                    messages: [...(chat.messages || []), optimisticMessage],
-                  }
-                : chat
-            ),
-          }));
+        // Update UI immediately with both messages for instant feedback
+        set((state) => ({
+          chats: state.chats.map((chat) =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  messages: [...(chat.messages || []), userMessage, optimisticAiMessage],
+                }
+              : chat
+          ),
+        }));
 
-          // Set loading state for AI response
-          set({ isLoading: true });
+        // Set loading state for AI response
+        set({ isLoading: true });
 
-          // --- PDF/TXT FILE HANDLING FOR GPT/CLAUDE ---
-          const hasFile = Array.isArray(message.attachments) && message.attachments.some(att => att.type === 'application/pdf' || att.type === 'text/plain');
-          if (hasFile) {
-            const fileAttachment = message.attachments!.find(att => att.type === 'application/pdf' || att.type === 'text/plain');
-            if (!fileAttachment) throw new Error('No file attachment found');
-            const file = fileAttachment.file;
-            if (!file) throw new Error('File object missing in attachment');
-            const formData = new FormData();
-            formData.append('prompt', message.content);
-            formData.append('temperature', '0.7');
-            formData.append('file', file);
-            // Choose endpoint based on model
+        // Handle API calls in the background without blocking UI
+        const handleApiCall = async () => {
+          try {
+            // Get auth token
+            const token = localStorage.getItem('token');
+            if (!token) {
+              throw new Error('Not authenticated');
+            }
+
+            // --- PDF/TXT FILE HANDLING FOR GPT/CLAUDE ---
+            const hasFile = Array.isArray(message.attachments) && message.attachments.some(att => att.type === 'application/pdf' || att.type === 'text/plain');
+            if (hasFile) {
+              const fileAttachment = message.attachments!.find(att => att.type === 'application/pdf' || att.type === 'text/plain');
+              if (!fileAttachment) throw new Error('No file attachment found');
+              const file = fileAttachment.file;
+              if (!file) throw new Error('File object missing in attachment');
+              const formData = new FormData();
+              formData.append('prompt', message.content);
+              formData.append('temperature', '0.7');
+              formData.append('file', file);
+              // Choose endpoint based on model
+              let endpoint = '';
+              if (message.model === 'claude') {
+                endpoint = 'http://localhost:8000/claude/generate';
+              } else {
+                endpoint = 'http://localhost:8000/gpt/generate-form';
+              }
+              const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: formData,
+              });
+              if (!response.ok) {
+                throw new Error('Failed to process file');
+              }
+              const data = await response.json();
+              // Update the optimistic AI message with real content
+              const aiMessage = {
+                ...optimisticAiMessage,
+                id: `ai-${Date.now()}`,
+                content: data.text || (data.aiMessage && data.aiMessage.text) || 'No response',
+              };
+              set((state) => ({
+                chats: state.chats.map((chat) =>
+                  chat.id === chatId
+                    ? {
+                        ...chat,
+                        messages: (chat.messages || [])
+                          .filter((msg) => typeof msg.id === 'string' ? !msg.id.startsWith('temp-ai-') : true)
+                          .concat([aiMessage]),
+                      }
+                    : chat
+                ),
+              }));
+              set({ isLoading: false });
+              return;
+            }
+            // --- END FILE HANDLING ---
+
+            // For regular messages, call the LLM service directly (no DB)
             let endpoint = '';
             if (message.model === 'claude') {
               endpoint = 'http://localhost:8000/claude/generate';
+            } else if (message.model === 'gpt') {
+              endpoint = 'http://localhost:8000/gpt/generate';
             } else {
-              endpoint = 'http://localhost:8000/gpt/generate-form';
+              endpoint = 'http://localhost:8000/llama/generate';
             }
+
             const response = await fetch(endpoint, {
               method: 'POST',
               headers: {
+                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
               },
-              body: formData,
+              body: JSON.stringify({
+                prompt: message.content,
+                temperature: 0.7
+              }),
             });
+
             if (!response.ok) {
-              throw new Error('Failed to process file');
+              throw new Error('Failed to get AI response');
             }
+
             const data = await response.json();
-            // Add the real user and AI messages
-            const userMessage = {
-              ...optimisticMessage,
-              id: data.userMessage?.id || `user-${Date.now()}`,
-              createdAt: new Date(),
-              timestamp: new Date(),
-            };
             const aiMessage = {
+              ...optimisticAiMessage,
               id: `ai-${Date.now()}`,
-              content: data.text || (data.aiMessage && data.aiMessage.text) || 'No response',
-              type: 'TEXT' as const,
-              model: message.model,
-              role: 'ASSISTANT' as const,
-              createdAt: new Date(),
-              timestamp: new Date(),
-              conversationId: chatId,
+              content: data.text || data.response || 'No response received',
             };
+
+            // Replace optimistic AI message with real message
             set((state) => ({
               chats: state.chats.map((chat) =>
                 chat.id === chatId
                   ? {
                       ...chat,
                       messages: (chat.messages || [])
-                        .filter((msg) => typeof msg.id === 'string' ? !msg.id.startsWith('temp-') : true)
-                        .concat([userMessage, aiMessage]),
+                        .filter((msg) => typeof msg.id === 'string' ? !msg.id.startsWith('temp-ai-') : true)
+                        .concat([aiMessage]),
                     }
                   : chat
               ),
             }));
-            set({ isLoading: false });
-            return;
-          }
-          // --- END FILE HANDLING ---
-
-          // Make API call in the background for all other messages
-          const response = await fetch(`${API_URL}/messages`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              ...message,
-              conversationId: chatId,
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to send message');
-          }
-
-          const { userMessage, aiMessage } = await response.json();
-          // Ensure messages have timestamp and are valid
-          const messagesWithTimestamp = [userMessage, aiMessage]
-            .filter((msg): msg is Message => {
-              const isValid = msg !== undefined && msg !== null;
-              if (!isValid) {
-                console.warn('Invalid message:', msg);
-              }
-              return isValid;
-            })
-            .map(msg => ({
-              ...msg,
-              timestamp: new Date(msg.createdAt),
-              createdAt: new Date(msg.createdAt),
+          } catch (error) {
+            console.error('Error sending message:', error);
+            // Remove optimistic AI message on error, keep user message
+            set((state) => ({
+              chats: state.chats.map((chat) =>
+                chat.id === chatId
+                  ? {
+                      ...chat,
+                      messages: (chat.messages || [])
+                        .filter((msg) => typeof msg.id === 'string' ? !msg.id.startsWith('temp-ai-') : true),
+                    }
+                  : chat
+              ),
             }));
+          } finally {
+            // Clear loading state
+            set({ isLoading: false });
+          }
+        };
 
-          // Replace all optimistic messages for this chat with real messages
-          set((state) => ({
-            chats: state.chats.map((chat) =>
-              chat.id === chatId
-                ? {
-                    ...chat,
-                    messages: (chat.messages || [])
-                      .filter((msg) => typeof msg.id === 'string' ? !msg.id.startsWith('temp-') : true)
-                      .concat(messagesWithTimestamp),
-                  }
-                : chat
-            ),
-          }));
-        } catch (error) {
-          console.error('Error sending message:', error);
-          // Remove optimistic message on error
-          set((state) => ({
-            chats: state.chats.map((chat) =>
-              chat.id === chatId
-                ? {
-                    ...chat,
-                    messages: (chat.messages || [])
-                      .filter((msg) => typeof msg.id === 'string' ? msg.id !== optimisticMessage.id : true),
-                  }
-                : chat
-            ),
-          }));
-          throw error;
-        } finally {
-          // Clear loading state
-          set({ isLoading: false });
-        }
+        // Start API call in background without awaiting
+        handleApiCall();
       },
 
       setAuthenticated: (authenticated: boolean) => {
@@ -409,34 +308,12 @@ export const useChatStore = create<ChatStore>()(
       },
 
       updateChat: async (chatId: string, updatedChat: Chat) => {
-        try {
-          const isAuthenticated = useAuthStore.getState().isAuthenticated();
-          if (!isAuthenticated) {
-            console.log('Not authenticated, redirecting to login');
-            window.location.href = '/login';
-            return;
-          }
-
-          const token = localStorage.getItem('token');
-          const response = await fetch(`${API_URL}/conversations/${chatId}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updatedChat),
-          });
-
-          if (!response.ok) throw new Error('Failed to update chat');
-
-          set((state) => ({
-            chats: state.chats.map((chat) =>
-              chat.id === chatId ? updatedChat : chat
-            ),
-          }));
-        } catch (error) {
-          console.error('Error updating chat:', error);
-        }
+        // Update chat in localStorage only - no DB calls
+        set((state) => ({
+          chats: state.chats.map((chat) =>
+            chat.id === chatId ? updatedChat : chat
+          ),
+        }));
       },
     }),
     {

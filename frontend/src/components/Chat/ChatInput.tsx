@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Paperclip, X, Image, FileText, Command, ChevronDown, Check } from 'lucide-react';
 import { useChatStore, Attachment, LLMProvider, Message } from '../../store/chatStore';
 import { Button } from '../ui/button';
@@ -32,7 +32,15 @@ export const ChatInput: React.FC = () => {
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showCommands, setShowCommands] = useState(false);
-  const { activeChat, addMessage, setLoading, isLoading, selectedProvider, setProvider, chats, createChat, setActiveChat } = useChatStore();
+  const activeChat = useChatStore((state) => state.activeChat);
+  const addMessage = useChatStore((state) => state.addMessage);
+  const setLoading = useChatStore((state) => state.setLoading);
+  const isLoading = useChatStore((state) => state.isLoading);
+  const selectedProvider = useChatStore((state) => state.selectedProvider);
+  const setProvider = useChatStore((state) => state.setProvider);
+  const chats = useChatStore((state) => state.chats);
+  const createChat = useChatStore((state) => state.createChat);
+  const setActiveChat = useChatStore((state) => state.setActiveChat);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -44,6 +52,11 @@ export const ChatInput: React.FC = () => {
 
   const selectedProviderInfo = providers.find(p => p.value === selectedProvider);
   const currentChat = chats.find(chat => chat.id === activeChat);
+
+  // Optimized provider selection handler
+  const handleProviderSelect = useCallback((provider: LLMProvider) => {
+    setProvider(provider);
+  }, [setProvider]);
 
   const commands = [
     { name: '/image', description: 'Generate an image' },
@@ -84,7 +97,7 @@ export const ChatInput: React.FC = () => {
     }
   }, [message]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() && !selectedFile) return;
 
@@ -96,90 +109,77 @@ export const ChatInput: React.FC = () => {
     // Clear input immediately for better UX
     setMessage('');
 
-    try {
-      // Always call addMessage for all message types (TXT, PDF, regular)
-      if (selectedFile && selectedFile.type === 'text/plain') {
-        clearSelectedFile();
-        const fileText = await selectedFile.text();
-        const fullMsg = msg + '\n\n---\nAttached file contents:\n' + fileText;
-        await addMessage(currentActiveChat!, {
-          content: fullMsg,
-          type: 'FILE',
-          model: selectedProvider,
-          role: 'USER',
-          attachments: [{
-            id: `file-${Date.now()}`,
-            name: selectedFile.name,
-            type: selectedFile.type,
-            size: selectedFile.size,
-            url: URL.createObjectURL(selectedFile)
-          }],
-        });
-        return;
-      }
-      if (selectedFile && selectedFile.type === 'application/pdf') {
-        clearSelectedFile();
-        await addMessage(currentActiveChat!, {
-          content: msg,
-          type: 'FILE',
-          model: selectedProvider,
-          role: 'USER',
-          attachments: [{
-            id: `file-${Date.now()}`,
-            name: selectedFile.name,
-            type: selectedFile.type,
-            size: selectedFile.size,
-            url: URL.createObjectURL(selectedFile),
-            file: selectedFile
-          }],
-        });
-        return;
-      }
-      // Fallback: /image or regular message
-      if (!currentActiveChat) {
-        // Create chat and send message in parallel
-        const newChat = await createChat();
-        if (newChat && newChat.id) {
-          setActiveChat(newChat.id);
+    // Handle message submission in background without blocking UI
+    const handleMessageSubmission = async () => {
+      try {
+        // Always call addMessage for all message types (TXT, PDF, regular)
+        if (selectedFile && selectedFile.type === 'text/plain') {
           clearSelectedFile();
-          await addMessage(newChat.id, {
-            content: msg,
-            type: selectedFile ? 'FILE' : 'TEXT',
+          const fileText = await selectedFile.text();
+          const fullMsg = msg + '\n\n---\nAttached file contents:\n' + fileText;
+          addMessage(currentActiveChat!, {
+            content: fullMsg,
+            type: 'FILE',
             model: selectedProvider,
             role: 'USER',
-            attachments: selectedFile ? [{
+            attachments: [{
               id: `file-${Date.now()}`,
               name: selectedFile.name,
               type: selectedFile.type,
               size: selectedFile.size,
               url: URL.createObjectURL(selectedFile)
-            }] : undefined
+            }],
           });
+          return;
         }
-      } else {
-        if (msg.toLowerCase().startsWith('/image')) {
-          const imagePrompt = msg.slice('/image'.length).trim();
-          if (!imagePrompt) {
-            console.error('No image prompt provided');
-            return;
-          }
-          setLoading(true);
-          try {
-            const response = await fetch('http://localhost:8000/gpt/generate', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              },
-              body: JSON.stringify({ 
-                prompt: msg,
-                temperature: 0.7
-              }),
+        if (selectedFile && selectedFile.type === 'application/pdf') {
+          clearSelectedFile();
+          addMessage(currentActiveChat!, {
+            content: msg,
+            type: 'FILE',
+            model: selectedProvider,
+            role: 'USER',
+            attachments: [{
+              id: `file-${Date.now()}`,
+              name: selectedFile.name,
+              type: selectedFile.type,
+              size: selectedFile.size,
+              url: URL.createObjectURL(selectedFile),
+              file: selectedFile
+            }],
+          });
+          return;
+        }
+        // Fallback: /image or regular message
+        if (!currentActiveChat) {
+          // Create chat and send message in parallel
+          const newChat = await createChat();
+          if (newChat && newChat.id) {
+            setActiveChat(newChat.id);
+            clearSelectedFile();
+            addMessage(newChat.id, {
+              content: msg,
+              type: selectedFile ? 'FILE' : 'TEXT',
+              model: selectedProvider,
+              role: 'USER',
+              attachments: selectedFile ? [{
+                id: `file-${Date.now()}`,
+                name: selectedFile.name,
+                type: selectedFile.type,
+                size: selectedFile.size,
+                url: URL.createObjectURL(selectedFile)
+              }] : undefined
             });
-            if (!response.ok) {
-              throw new Error('Failed to generate image');
+          }
+        } else {
+          if (msg.toLowerCase().startsWith('/image')) {
+            const imagePrompt = msg.slice('/image'.length).trim();
+            if (!imagePrompt) {
+              console.error('No image prompt provided');
+              return;
             }
-            const data = await response.json();
+            setLoading(true);
+            // Always add the user message first
             const userMessage: Message = {
               id: `temp-${Date.now()}`,
               content: msg,
@@ -190,78 +190,130 @@ export const ChatInput: React.FC = () => {
               timestamp: new Date(),
               conversationId: currentActiveChat,
             };
-            const aiMessage: Message = {
-              id: `temp-${Date.now() + 1}`,
-              content: data.image
-                ? `![Generated Image](${data.image})`
-                : data.image_url
-                  ? `![Generated Image](${data.image_url})`
-                  : 'Image generation failed',
-              type: 'TEXT' as const,
+            useChatStore.setState((state) => ({
+              ...state,
+              chats: state.chats.map((chat) =>
+                chat.id === currentActiveChat
+                  ? {
+                      ...chat,
+                      messages: [...(chat.messages || []), userMessage],
+                    }
+                  : chat
+              ),
+            }));
+            try {
+              const response = await fetch('http://localhost:8000/gpt/image', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ 
+                  prompt: imagePrompt,
+                  temperature: 0.7
+                }),
+              });
+              if (!response.ok) throw new Error('Failed to generate image');
+              const data = await response.json();
+              if (data.image || data.image_url) {
+                const aiMessage: Message = {
+                  id: `temp-${Date.now() + 1}`,
+                  content: data.image
+                    ? `![Generated Image](${data.image})`
+                    : `![Generated Image](${data.image_url})`,
+                  type: 'TEXT' as const,
+                  model: selectedProvider,
+                  role: 'ASSISTANT',
+                  createdAt: new Date(),
+                  timestamp: new Date(),
+                  conversationId: currentActiveChat,
+                };
+                useChatStore.setState((state) => ({
+                  ...state,
+                  chats: state.chats.map((chat) =>
+                    chat.id === currentActiveChat
+                      ? {
+                          ...chat,
+                          messages: [...(chat.messages || []), aiMessage],
+                        }
+                      : chat
+                  ),
+                }));
+              } else {
+                // Only add error if image is missing
+                const errorMessage: Message = {
+                  id: `temp-${Date.now() + 2}`,
+                  content: 'Sorry, I encountered an error while generating the image. Please try again.',
+                  type: 'TEXT' as const,
+                  model: 'gpt',
+                  role: 'ASSISTANT',
+                  createdAt: new Date(),
+                  timestamp: new Date(),
+                  conversationId: currentActiveChat,
+                };
+                useChatStore.setState((state) => ({
+                  ...state,
+                  chats: state.chats.map((chat) =>
+                    chat.id === currentActiveChat
+                      ? {
+                          ...chat,
+                          messages: [...(chat.messages || []), errorMessage],
+                        }
+                      : chat
+                  ),
+                }));
+              }
+            } catch (error) {
+              // Only add error if fetch fails
+              const errorMessage: Message = {
+                id: `temp-${Date.now() + 3}`,
+                content: 'Sorry, I encountered an error while generating the image. Please try again.',
+                type: 'TEXT' as const,
+                model: 'gpt',
+                role: 'ASSISTANT',
+                createdAt: new Date(),
+                timestamp: new Date(),
+                conversationId: currentActiveChat,
+              };
+              useChatStore.setState((state) => ({
+                ...state,
+                chats: state.chats.map((chat) =>
+                  chat.id === currentActiveChat
+                    ? {
+                        ...chat,
+                        messages: [...(chat.messages || []), errorMessage],
+                      }
+                    : chat
+                ),
+              }));
+            } finally {
+              setLoading(false);
+            }
+          } else {
+            // Regular message
+            clearSelectedFile();
+            addMessage(currentActiveChat, {
+              content: msg,
+              type: selectedFile ? 'FILE' : 'TEXT',
               model: selectedProvider,
-              role: 'ASSISTANT',
-              createdAt: new Date(),
-              timestamp: new Date(),
-              conversationId: currentActiveChat,
-            };
-            useChatStore.setState((state) => ({
-              ...state,
-              chats: state.chats.map((chat) =>
-                chat.id === currentActiveChat
-                  ? {
-                      ...chat,
-                      messages: [...(chat.messages || []), userMessage, aiMessage],
-                    }
-                  : chat
-              ),
-            }));
-          } catch (error) {
-            console.error('Error generating image:', error);
-            const errorMessage: Message = {
-              id: `temp-${Date.now()}`,
-              content: 'Sorry, I encountered an error while generating the image. Please try again.',
-              type: 'TEXT' as const,
-              model: 'gpt',
-              role: 'ASSISTANT',
-              createdAt: new Date(),
-              timestamp: new Date(),
-              conversationId: currentActiveChat,
-            };
-            useChatStore.setState((state) => ({
-              ...state,
-              chats: state.chats.map((chat) =>
-                chat.id === currentActiveChat
-                  ? {
-                      ...chat,
-                      messages: [...(chat.messages || []), errorMessage],
-                    }
-                  : chat
-              ),
-            }));
-          } finally {
-            setLoading(false);
+              role: 'USER',
+              attachments: selectedFile ? [{
+                id: `file-${Date.now()}`,
+                name: selectedFile.name,
+                type: selectedFile.type,
+                size: selectedFile.size,
+                url: URL.createObjectURL(selectedFile)
+              }] : undefined
+            });
           }
-        } else {
-          clearSelectedFile();
-          await addMessage(currentActiveChat, {
-            content: msg,
-            type: selectedFile ? 'FILE' : 'TEXT',
-            model: selectedProvider,
-            role: 'USER',
-            attachments: selectedFile ? [{
-              id: `file-${Date.now()}`,
-              name: selectedFile.name,
-              type: selectedFile.type,
-              size: selectedFile.size,
-              url: URL.createObjectURL(selectedFile)
-            }] : undefined
-          });
         }
+      } catch (error) {
+        console.error('Error in message submission:', error);
       }
-    } catch (error) {
-      console.error('Error in handleSubmit:', error);
-      setLoading(false);
-    }
+    };
+
+    // Start message submission in background without blocking UI
+    handleMessageSubmission();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -420,7 +472,7 @@ export const ChatInput: React.FC = () => {
                   return (
                     <DropdownMenuItem
                       key={provider.value}
-                      onClick={() => setProvider(provider.value)}
+                      onClick={() => handleProviderSelect(provider.value)}
                       onMouseEnter={() => setHoveredProvider(provider.value)}
                       onMouseLeave={() => setHoveredProvider(null)}
                       className={`cursor-pointer flex items-center justify-between transition-colors

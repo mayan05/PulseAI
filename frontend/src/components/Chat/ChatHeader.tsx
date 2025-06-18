@@ -15,7 +15,9 @@ interface ChatHeaderProps {
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({ onToggleSidebar, user }) => {
-  const { chats, activeChat, deleteChat } = useChatStore();
+  const chats = useChatStore((state) => state.chats);
+  const activeChat = useChatStore((state) => state.activeChat);
+  const deleteChat = useChatStore((state) => state.deleteChat);
   const currentChat = chats.find(chat => chat.id === activeChat);
 
   const handleDelete = async () => {

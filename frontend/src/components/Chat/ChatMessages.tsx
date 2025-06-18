@@ -3,8 +3,10 @@ import { useChatStore } from '../../store/chatStore';
 import { MessageBubble } from './MessageBubble';
 import { LoadingMessage } from './LoadingMessage';
 
-export const ChatMessages: React.FC = () => {
-  const { chats, activeChat, isLoading } = useChatStore();
+export const ChatMessages: React.FC = React.memo(() => {
+  const chats = useChatStore((state) => state.chats);
+  const activeChat = useChatStore((state) => state.activeChat);
+  const isLoading = useChatStore((state) => state.isLoading);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -93,7 +95,7 @@ export const ChatMessages: React.FC = () => {
       )}
     </div>
   );
-};
+});
 
 // Add fade-in-up animation
 const style = document.createElement("style");
