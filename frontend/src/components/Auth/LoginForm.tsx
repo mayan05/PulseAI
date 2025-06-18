@@ -23,7 +23,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup }) => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/login', {
+      const response = await fetch('https://pulse-backend-1ocr.onrender.com/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -25,7 +25,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
 
     try {
       console.log('Attempting signup with:', { name, email });
-      const response = await fetch('http://localhost:3000/signup', {
+      const response = await fetch('https://pulse-backend-1ocr.onrender.com/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
