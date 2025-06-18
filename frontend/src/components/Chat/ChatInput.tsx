@@ -202,7 +202,7 @@ export const ChatInput: React.FC = () => {
               ),
             }));
             try {
-              const response = await fetch('http://localhost:8000/gpt/image', {
+              const response = await fetch('https://llmservice-production-7cd2.up.railway.app/gpt/image', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
