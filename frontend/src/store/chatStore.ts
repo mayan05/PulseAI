@@ -219,7 +219,7 @@ export const useChatStore = create<ChatStore>()(
             // For regular messages, call the LLM service directly (no DB)
             let endpoint = '';
             if (message.model === 'claude') {
-              endpoint = 'http://localhost:8000/claude/generate';
+              endpoint = 'http://localhost:8000/claude/generate-json';
             } else if (message.model === 'gpt') {
               endpoint = 'http://localhost:8000/gpt/generate';
             } else {

@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 import PyPDF2
 import io
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import base64
 import logging
 import requests
@@ -25,6 +25,7 @@ router = APIRouter(prefix="/gpt", tags=["gpt"])
 class GenerateRequest(BaseModel):
     prompt: str
     temperature: float = 0.7
+    conversation_history: Optional[List[Dict[str, Any]]] = []
 
 class ImageGenerateRequest(BaseModel):
     prompt: str
@@ -75,17 +76,31 @@ async def generate_text(data: GenerateRequest):
             
         client = OpenAI(api_key=api_key)
         
-        messages = [{"role": "user", "content": data.prompt}]
+        # Build messages array from conversation history + current prompt
+        messages = []
         
-        # Call OpenAI API
+        # Add conversation history if provided
+        if data.conversation_history:
+            messages.extend(data.conversation_history)
+        
+        # Add current user message
+        messages.append({
+            "role": "user",
+            "content": data.prompt
+        })
+        
+        # Call OpenAI API with full conversation history
         response = client.chat.completions.create(
             model="gpt-4",
             messages=messages,
             temperature=data.temperature
         )
         
+        # Extract assistant's response
+        assistant_msg = response.choices[0].message.content
+        
         return JSONResponse(content={
-            "text": response.choices[0].message.content,
+            "text": assistant_msg,
             "model": "gpt-4",
             "timestamp": datetime.now().isoformat()
         })

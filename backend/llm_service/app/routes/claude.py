@@ -95,3 +95,45 @@ async def claudeTime(
             status_code=500,
             detail=f"Internal Server Error: {str(e)}"
         )
+
+# JSON endpoint for regular text messages (no file upload)
+@claudeRouter.post("/generate-json", response_class=JSONResponse)
+async def claudeTimeJson(data: GenerateRequest):
+    global claude_history
+    try:
+        claude_history.append({
+            "role": "user",
+            "content": data.prompt
+        })
+
+        # Convert history to messages format
+        messages = []
+        for msg in claude_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+
+        response = claude.messages.create(
+            model="claude-sonnet-4-20250514",
+            system=SYSTEM_MESSAGE,
+            messages=messages,
+            temperature=data.temperature,
+            max_tokens=1024
+        )
+
+        ass_msg = response.content[0].text
+        claude_history.append({
+            "role": "assistant",
+            "content": ass_msg
+        })
+
+        return JSONResponse(content={
+            "text": ass_msg,
+            "model": "claude-sonnet-4-20250514",
+            "timestamp": datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        print(f"Error details: {str(e)}")  # Add detailed logging
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal Server Error: {str(e)}"
+        )
