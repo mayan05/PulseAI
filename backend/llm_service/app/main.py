@@ -23,11 +23,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:8080",
         "http://localhost:5173",
-<<<<<<< HEAD
         "https://t3-chat-coral.vercel.app/"
-=======
-        "https://your-production-frontend-url.com"
->>>>>>> fcfd689325567a14223181162395de706acf5dca
     ],
     allow_credentials=True,
     allow_methods=["*"],
