@@ -36,5 +36,5 @@ app.include_router(router)
 app.include_router(llamaRouter)
 app.include_router(claudeRouter)
 
-if _name_ == "_main_":
+if __name__ == "_main_":
     uvicorn.run("main:app", host="localhost", port=8000, reload=True)
