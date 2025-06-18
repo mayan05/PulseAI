@@ -20,7 +20,11 @@ app = FastAPI(title="LLM Service")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:8080",
+        "http://localhost:5173",
+        "https://t3-chat-coral.vercel.app/"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,5 +35,5 @@ app.include_router(router)
 app.include_router(llamaRouter)
 app.include_router(claudeRouter)
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="localhost", port=8000, reload=True) 
+if _name_ == "_main_":
+    uvicorn.run("main:app", host="localhost", port=8000, reload=True)
